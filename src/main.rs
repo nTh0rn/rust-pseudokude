@@ -452,7 +452,7 @@ fn main() {
 	let mut t: usize = &b_stack.len()-1; //Top of the stack of boards
 	let mut reset: bool = true; //Whether or not to reset if the board isn't solved yet.
 
-	//Main loop
+	//Main back-tracking loop
 	while reset == true {
 		reset = false;
 
@@ -489,14 +489,13 @@ fn main() {
 					//No possibilities mean the current board state is impossible to solve.
 					} else {
 
-						//Pop top of stack.
-						b_stack.remove(t);
-
-						if b_stack.len() == 0 {
+                        if b_stack.len() == 1 {
 							panic!("ERROR - Sudoku board not entered correctly.");
 						}
 
-						t = b_stack.len()-1;
+						//Pop top of stack.
+						b_stack.remove(t);
+                        t = b_stack.len()-1;
 
 						//Revert the last-modified cell to a 0 and update its p_limit list.
 						b_stack[t].cell[b.last_modified[0]][b.last_modified[1]].p_limit.push(b.last_modified[2] as u16);
@@ -524,7 +523,7 @@ fn main() {
 	//Show the solved board
 	b_stack[t].show();
 
-	println!("\nCompleted in {} milliseconds.", final_ms);
+	println!("\nSolved in {} milliseconds.", final_ms);
 	pause();
 
 
