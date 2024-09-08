@@ -288,7 +288,7 @@ impl Board {
 			k = 0;
 
             //Show board during calculation. (SUPER SLOWDOWN)
-			//self.show();
+			self.show();
 
             //Iterate through cels
 			'outer: while i < self.bsize {
@@ -429,29 +429,23 @@ fn main() {
     */
 
     //The sudoku board to solve.
+    //Beyond-hell difficulty
     let mut init = vec![
-            vec![13,0,0,0,0,10,0,0,6,0,0,0,0,11,0,0],
-            vec![14,3,0,0,0,12,0,9,10,0,0,0,16,0,0,0],
-            vec![0,9,0,0,0,0,1,0,0,0,15,13,8,0,0,12],
-            vec![0,0,0,15,16,0,14,8,4,0,0,0,10,3,2,0],
-            vec![0,0,13,8,15,0,3,0,1,2,6,0,0,16,0,0],
-            vec![0,0,0,0,5,1,6,0,7,0,3,4,0,12,0,0],
-            vec![6,0,0,11,0,2,0,0,0,13,0,15,0,0,0,0],
-            vec![3,0,12,0,0,0,13,0,0,0,5,11,1,0,6,15],
-            vec![0,1,0,13,6,3,0,0,0,0,0,0,2,0,16,0],
-            vec![10,0,0,0,0,0,9,0,8,0,4,16,3,13,0,0],
-            vec![0,11,2,0,7,8,0,16,0,10,13,0,0,0,15,4],
-            vec![12,0,0,14,11,15,0,13,0,0,2,7,5,0,0,0],
-            vec![7,8,0,0,9,0,0,2,0,11,0,10,12,0,0,0],
-            vec![9,0,3,0,0,13,0,0,15,0,0,14,0,0,0,0],
-            vec![0,10,0,1,0,11,0,3,0,0,0,0,0,8,7,0],
-            vec![0,0,15,12,10,0,5,0,2,7,0,0,0,0,9,16]];
+        vec![9,0,0,0,0,0,0,0,0],
+        vec![0,0,0,0,1,0,0,6,0],
+        vec![0,0,7,3,0,0,8,0,9],
+        vec![0,1,0,4,2,0,0,0,0],
+        vec![0,0,0,0,0,0,0,5,0],
+        vec![6,5,3,0,0,0,0,0,0],
+        vec![8,0,0,0,6,0,0,0,0],
+        vec![0,0,0,0,0,9,0,4,0],
+        vec![0,2,9,0,0,7,1,0,0]];
 
 
 	let mut b = Board::new(init.len()); //The main board
 	let mut b_stack: Vec<Board> = vec![]; //The stack of boards
 
-	b.init(&mut init); //Initialize cells and area coordinates
+	b.init(&init); //Initialize cells and area coordinates
 	b.process_of_elimination(); //Possibilities initialization
 	b_stack.push(b.clone()); //Push first unsolved board to stack.
 
