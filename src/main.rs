@@ -211,6 +211,7 @@ impl Board {
 
 		let mut limit: Vec<u16> = vec![];
 
+        //Main loop
 		while reset == true {
 			reset = false;
 
@@ -218,8 +219,11 @@ impl Board {
 			j = 0;
 			k = 1;
 
+            //Iterate through cells
 			'outer: while i < self.bsize {
 				while j < self.bsize {
+
+                    //Ensure cell is a 0
 					if self.cell[i][j].digit == 0 {
 
 						limit.clear();
@@ -253,7 +257,6 @@ impl Board {
 			}
 		}
 	}
-
 
 	//Checks for lone-possibility's and updates all possibilities.
 	fn process_of_elimination(&mut self) {
@@ -422,7 +425,6 @@ fn main() {
 	*/
 
 	//The sudoku board to solve.
-	//Beyond-hell difficulty
 	let init = vec![
 			vec![1,2,0,3,0,0,0,0,0],
 			vec![4,0,0,0,0,0,3,0,0],
