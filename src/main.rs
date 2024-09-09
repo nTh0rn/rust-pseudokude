@@ -336,7 +336,7 @@ fn main() {
 	let start_ms = since_the_epoch.as_secs() * 1000 +
 		since_the_epoch.subsec_nanos() as u64 / 1_000_000;
 
-	/* Example boards to solve
+	/* Example 9x9 and 16x16 boards to solve.
 		//Easy difficulty
 		let init = vec![
 			vec![8,0,1,9,0,0,0,4,0],
