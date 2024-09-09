@@ -487,6 +487,7 @@ fn main() {
 					//No possibilities mean the current board state is impossible to solve.
 					} else {
 
+                        //Only encountered if the board is unsolvable, which means it was entered incorrectly.
                         if b_stack.len() == 1 {
 							panic!("ERROR - Sudoku board not entered correctly.");
 						}
