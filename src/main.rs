@@ -24,11 +24,6 @@ impl Cell {
 			p_limit: vec![],
 		}
 	}
-
-	//Set current digit to first possibility
-	fn set_p(&mut self) {
-		self.digit = self.p[0];
-	}
 }
 
 //Entire board containing size information and 2d vector of cells.
@@ -471,7 +466,7 @@ fn main() {
 					if b.cell[i][j].p.len() > 0 {
 
 						//Set cell to first possibility and update the last-modified cell data.
-						b.cell[i][j].set_p();
+						b.cell[i][j].digit = b.cell[i][j].p[0];
 						b.last_modified = [i, j, b.cell[i][j].p[0] as usize];
 						
 						//Update all possibilities and check for lone-possibilities in rows/cols/houses.
