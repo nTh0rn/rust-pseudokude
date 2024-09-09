@@ -1,14 +1,9 @@
 use std::process::Command;
-use std::io::{stdin, stdout, Read, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::process;
-
 
 //Individual cell holding all aoe information.
 #[derive(Clone)]
 pub struct Cell {
-	y: u16,
-	x: u16,
 	digit: u16, //Digit of cell
 	row: Vec<[usize; 2]>, //Coordinates of cell's row
 	col: Vec<[usize; 2]>, //Coordinates of cell's col
@@ -19,10 +14,8 @@ pub struct Cell {
 impl Cell {
 
 	//Constructor
-	pub fn new(y: u16, x:u16) -> Self {
+	pub fn new() -> Self {
 		Self {
-			y,
-			x,
 			digit: 0,
 			row: vec![],
 			col: vec![],
@@ -63,16 +56,16 @@ impl Board {
 		let mut i: usize = 0;
 		let mut j: usize = 0;
 		let mut k: usize = 0;
-		let mut l: usize = 0;
+		let mut l: usize;
 
-		let mut hx: usize = 0;
-		let mut hy: usize = 0;
+		let mut hx: usize;
+		let mut hy: usize;
 
 		//Initialize cells with their digits
 		while i < self.bsize {
 			self.cell.push(Vec::new());
 			while j < self.bsize {
-				self.cell[i].push(Cell::new(i as u16, j as u16));
+				self.cell[i].push(Cell::new());
 				self.cell[i][j].digit = init[i][j];
 				j = j + 1;
 			}
@@ -109,8 +102,8 @@ impl Board {
 			while j < self.bsize {
 
 				//Calculate top-left coordinate of cell's house.
-				hy = ((((i/self.hsize) as f64).floor() as usize)*(self.hsize));
-				hx = ((((j/self.hsize) as f64).floor() as usize)*(self.hsize));
+				hy = (((i/self.hsize) as f64).floor() as usize)*(self.hsize);
+				hx = (((j/self.hsize) as f64).floor() as usize)*(self.hsize);
 
 				k = 0;
 				l = 0;
@@ -141,51 +134,55 @@ impl Board {
 		let mut k = 0;
 		let mut l = 0;
 
+        let mut output = String::from("");
+
 		let mut space_per_digit = 2;
 
 		if self.hsize > 3 {
 			space_per_digit = 3;
 		}
+        
+		print!("\x1B[2J\x1B[1;1H");
+        output.push_str("\n");
 
-		print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
-
-		println!();
 		while i < self.bsize {
 			while j < self.bsize {
 				if self.cell[i][j].digit < 10 && self.hsize > 3 {
-					print!(" ");
+					output.push_str(" ");
 				}
 				if self.cell[i][j].digit != 0 {
-					print!("{}", self.cell[i][j].digit);
+                    output.push_str(&self.cell[i][j].digit.to_string());
 				} else {
-					print!(" ");
+                    output.push_str(" ");
 				}
 				if (j+1) % self.hsize == 0 && (j+1) != (self.hsize*self.hsize) {
-					print!("|");
+                    output.push_str("|");
 				} else {
-					print!(" ");
+                    output.push_str(" ");
 				}
 				j = j + 1;
 			}
-			println!("");
+            output.push_str("\n");
 			if (i+1) % self.hsize == 0 && (i+1) != (self.hsize*self.hsize) {
 				while k < self.hsize {
 					while l < (self.hsize*space_per_digit)-1 {
-						print!("-");
+                        output.push_str("-");
 						l = l + 1;
 					}
 					if k != self.hsize-1 {
-						print!("+");
+                        output.push_str("+");
 					}
 					l=0;
 					k = k + 1;
 				}
 				k = 0;
-				println!("");
+                output.push_str("\n");
 			}
 			j = 0;
 			i = i + 1;
 		}
+
+        print!("{}", output);
 	}
 
 	//Returns a vector of digits OR possibilities from a vector of coordinates
@@ -196,7 +193,7 @@ impl Board {
 		for each in area {
 
 			//Whether to return area's digits or all of area's possibilities
-			if(return_p) {
+			if return_p {
 				for each in &self.cell[each[0]][each[1]].p {
 					output.push(*each);
 				}
@@ -211,9 +208,9 @@ impl Board {
 
 	//Updates the possibilities of all cells, restricted by p_limit.
 	fn update_all_p(&mut self) {
-		let mut i: usize = 0;
-		let mut j: usize = 0;
-		let mut k: usize = 1;
+		let mut i: usize;
+		let mut j: usize;
+		let mut k: usize;
 
 		let mut reset: bool = true;
 
@@ -265,14 +262,14 @@ impl Board {
 
 	//Checks for lone-possibility's and updates all possibilities.
 	fn process_of_elimination(&mut self) {
-		let mut i: usize = 0;
-		let mut j: usize = 0;
-		let mut k: usize = 0;
+		let mut i: usize;
+		let mut j: usize;
+		let mut k: usize;
 
-		let mut p: u16 = 0; //Current cell's possibility
-		let mut row: Vec<u16> = vec![]; //Current cell's row
-		let mut col: Vec<u16> = vec![]; //Current cell's col
-		let mut house: Vec<u16> = vec![]; //Current cell's house
+		let mut p: u16; //Current cell's possibility
+		let mut row: Vec<u16>; //Current cell's row
+		let mut col: Vec<u16>; //Current cell's col
+		let mut house: Vec<u16>; //Current cell's house
 
 		let mut reset: bool = true; //Whether or not to end search
 		
@@ -307,6 +304,7 @@ impl Board {
 							p = self.cell[i][j].p[k];
 							if !row.contains(&p) || !col.contains(&p) || !house.contains(&p) {
 								self.cell[i][j].digit = p;
+                                reset = true;
 								break 'outer;
 							}
 							k = k + 1;
@@ -329,8 +327,8 @@ fn pause() {
 
 //Main code containing backtracking logic.
 fn main() {
-	let mut i: usize = 0;
-	let mut j: usize = 0;
+	let mut i: usize;
+	let mut j: usize;
 
 	println!("Press enter to begin.");
 	pause();
@@ -340,9 +338,9 @@ fn main() {
 	let start_ms = since_the_epoch.as_secs() * 1000 +
 		since_the_epoch.subsec_nanos() as u64 / 1_000_000;
 
-	/**
+	/*
 		//Easy difficulty
-		let mut init = vec![
+		let init = vec![
 			vec![8,0,1,9,0,0,0,4,0],
 			vec![0,4,0,8,5,1,0,2,0],
 			vec![0,5,6,0,7,0,0,9,1],
@@ -354,7 +352,7 @@ fn main() {
 			vec![0,0,3,1,0,0,2,5,0],
 
 		//Extreme difficulty
-		let mut init = vec![
+		let init = vec![
 			vec![0,0,7,6,0,5,9,4,0],
 			vec![0,0,0,0,0,0,0,0,6],
 			vec![8,0,0,1,0,0,0,0,0],
@@ -366,7 +364,7 @@ fn main() {
 			vec![0,0,3,0,0,0,0,0,2]];
 		
 		//Beyond-hell difficulty
-		let mut init = vec![
+		let init = vec![
 			vec![9,0,0,0,0,0,0,0,0],
 			vec![0,0,0,0,1,0,0,6,0],
 			vec![0,0,7,3,0,0,8,0,9],
@@ -378,7 +376,7 @@ fn main() {
 			vec![0,2,9,0,0,7,1,0,0]];
 
 		Rated 11.9 difficulty
-		let mut init = vec![
+		let init = vec![
 			vec![1,2,0,3,0,0,0,0,0],
 			vec![4,0,0,0,0,0,3,0,0],
 			vec![0,0,3,0,5,0,0,0,0],
@@ -390,7 +388,7 @@ fn main() {
 			vec![0,0,0,0,0,7,0,0,8]];
 		
 		//Easy 16x16
-		let mut init = vec![
+		let init = vec![
 			vec![0,4,0,16,2,0,10,14,0,6,0,0,5,15,3,8],
 			vec![2,0,0,8,11,5,6,4,9,15,13,14,7,0,12,0],
 			vec![0,7,0,12,3,0,1,16,10,4,0,0,0,0,0,0],
@@ -409,7 +407,7 @@ fn main() {
 			vec![16,10,9,1,12,11,0,6,13,0,7,0,2,14,0,0]];
 
 		//Extreme difficulty 16x16
-		let mut init = vec![
+		let init = vec![
 			vec![13,0,0,0,0,10,0,0,6,0,0,0,0,11,0,0],
 			vec![14,3,0,0,0,12,0,9,10,0,0,0,16,0,0,0],
 			vec![0,9,0,0,0,0,1,0,0,0,15,13,8,0,0,12],
@@ -430,16 +428,16 @@ fn main() {
 
 	//The sudoku board to solve.
 	//Beyond-hell difficulty
-	let mut init = vec![
-		vec![9,0,0,0,0,0,0,0,0],
-		vec![0,0,0,0,1,0,0,6,0],
-		vec![0,0,7,3,0,0,8,0,9],
-		vec![0,1,0,4,2,0,0,0,0],
-		vec![0,0,0,0,0,0,0,5,0],
-		vec![6,5,3,0,0,0,0,0,0],
-		vec![8,0,0,0,6,0,0,0,0],
-		vec![0,0,0,0,0,9,0,4,0],
-		vec![0,2,9,0,0,7,1,0,0]];
+	let init = vec![
+			vec![1,2,0,3,0,0,0,0,0],
+			vec![4,0,0,0,0,0,3,0,0],
+			vec![0,0,3,0,5,0,0,0,0],
+			vec![0,0,4,2,0,0,5,0,0],
+			vec![0,0,0,0,8,0,0,0,9],
+			vec![0,6,0,0,0,5,0,7,0],
+			vec![0,0,1,5,0,0,2,0,0],
+			vec![0,0,0,0,9,0,0,6,0],
+			vec![0,0,0,0,0,7,0,0,8]];
 
 
 	let mut b = Board::new(init.len()); //The main board
