@@ -131,34 +131,43 @@ impl Board {
 
         let mut output = String::from("");
 
-		let mut space_per_digit = 2;
-
-		if self.hsize > 3 {
-			space_per_digit = 3;
-		}
+		//How much space, including whitespace, each digit needs.
+		let space_per_digit = ((self.bsize as f64).log10()+2.0).floor() as usize;
         
 		print!("\x1B[2J\x1B[1;1H");
         output.push_str("\n");
 
+		//Main loop
 		while i < self.bsize {
 			while j < self.bsize {
-				if self.cell[i][j].digit < 10 && self.hsize > 3 {
-					output.push_str(" ");
-				}
+
+				//Ensure enough white-space before digit.
 				if self.cell[i][j].digit != 0 {
+					while k < space_per_digit-(((self.cell[i][j].digit).checked_ilog10().unwrap_or(0)+2) as usize) {
+						output.push_str(" ");
+						k = k + 1;
+					}
                     output.push_str(&self.cell[i][j].digit.to_string());
 				} else {
-                    output.push_str(" ");
+					while k < space_per_digit-1 {
+						output.push_str(" ");
+						k = k + 1;
+					}
 				}
-				if (j+1) % self.hsize == 0 && (j+1) != (self.hsize*self.hsize) {
+
+				//Add vertical line when end of house is reached.
+				if (j+1) % self.hsize == 0 && (j+1) != (self.bsize) {
                     output.push_str("|");
 				} else {
                     output.push_str(" ");
 				}
+				k = 0;
 				j = j + 1;
 			}
             output.push_str("\n");
-			if (i+1) % self.hsize == 0 && (i+1) != (self.hsize*self.hsize) {
+
+			//Add horizontal line when end of house is reached.
+			if (i+1) % self.hsize == 0 && (i+1) != (self.bsize) {
 				while k < self.hsize {
 					while l < (self.hsize*space_per_digit)-1 {
                         output.push_str("-");
@@ -170,9 +179,9 @@ impl Board {
 					l=0;
 					k = k + 1;
 				}
-				k = 0;
                 output.push_str("\n");
 			}
+			k = 0;
 			j = 0;
 			i = i + 1;
 		}
@@ -373,7 +382,7 @@ fn main() {
 			vec![0,0,0,0,0,9,0,4,0],
 			vec![0,2,9,0,0,7,1,0,0]];
 
-		Rated 11.9 difficulty
+		//Rated 11.9 difficulty
 		let init = vec![
 			vec![1,2,0,3,0,0,0,0,0],
 			vec![4,0,0,0,0,0,3,0,0],
@@ -425,16 +434,17 @@ fn main() {
 	*/
 
 	//The sudoku board to solve.
+	//Rated 11.9 difficulty
 	let init = vec![
-			vec![1,2,0,3,0,0,0,0,0],
-			vec![4,0,0,0,0,0,3,0,0],
-			vec![0,0,3,0,5,0,0,0,0],
-			vec![0,0,4,2,0,0,5,0,0],
-			vec![0,0,0,0,8,0,0,0,9],
-			vec![0,6,0,0,0,5,0,7,0],
-			vec![0,0,1,5,0,0,2,0,0],
-			vec![0,0,0,0,9,0,0,6,0],
-			vec![0,0,0,0,0,7,0,0,8]];
+		vec![1,2,0,3,0,0,0,0,0],
+		vec![4,0,0,0,0,0,3,0,0],
+		vec![0,0,3,0,5,0,0,0,0],
+		vec![0,0,4,2,0,0,5,0,0],
+		vec![0,0,0,0,8,0,0,0,9],
+		vec![0,6,0,0,0,5,0,7,0],
+		vec![0,0,1,5,0,0,2,0,0],
+		vec![0,0,0,0,9,0,0,6,0],
+		vec![0,0,0,0,0,7,0,0,8]];
 
 
 	let mut b = Board::new(init.len()); //The main board
