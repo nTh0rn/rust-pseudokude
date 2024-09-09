@@ -129,13 +129,13 @@ impl Board {
 		let mut k = 0;
 		let mut l = 0;
 
-        let mut output = String::from("");
+		let mut output = String::from("");
 
 		//How much space, including whitespace, each digit needs.
 		let space_per_digit = ((self.bsize as f64).log10()+2.0).floor() as usize;
-        
+		
 		print!("\x1B[2J\x1B[1;1H");
-        output.push_str("\n");
+		output.push_str("\n");
 
 		//Main loop
 		while i < self.bsize {
@@ -147,7 +147,7 @@ impl Board {
 						output.push_str(" ");
 						k = k + 1;
 					}
-                    output.push_str(&self.cell[i][j].digit.to_string());
+					output.push_str(&self.cell[i][j].digit.to_string());
 				} else {
 					while k < space_per_digit-1 {
 						output.push_str(" ");
@@ -157,36 +157,36 @@ impl Board {
 
 				//Add vertical line when end of house is reached.
 				if (j+1) % self.hsize == 0 && (j+1) != (self.bsize) {
-                    output.push_str("|");
+					output.push_str("|");
 				} else {
-                    output.push_str(" ");
+					output.push_str(" ");
 				}
 				k = 0;
 				j = j + 1;
 			}
-            output.push_str("\n");
+			output.push_str("\n");
 
 			//Add horizontal line when end of house is reached.
 			if (i+1) % self.hsize == 0 && (i+1) != (self.bsize) {
 				while k < self.hsize {
 					while l < (self.hsize*space_per_digit)-1 {
-                        output.push_str("-");
+						output.push_str("-");
 						l = l + 1;
 					}
 					if k != self.hsize-1 {
-                        output.push_str("+");
+						output.push_str("+");
 					}
 					l=0;
 					k = k + 1;
 				}
-                output.push_str("\n");
+				output.push_str("\n");
 			}
 			k = 0;
 			j = 0;
 			i = i + 1;
 		}
 
-        print!("{}", output);
+		print!("{}", output);
 	}
 
 	//Returns a vector of digits OR possibilities from a vector of coordinates
@@ -220,7 +220,7 @@ impl Board {
 
 		let mut limit: Vec<u16> = vec![];
 
-        //Main loop
+		//Main loop
 		while reset == true {
 			reset = false;
 
@@ -228,11 +228,11 @@ impl Board {
 			j = 0;
 			k = 1;
 
-            //Iterate through cells
+			//Iterate through cells
 			'outer: while i < self.bsize {
 				while j < self.bsize {
 
-                    //Ensure cell is a 0
+					//Ensure cell is a 0
 					if self.cell[i][j].digit == 0 {
 
 						limit.clear();
@@ -311,7 +311,7 @@ impl Board {
 							p = self.cell[i][j].p[k];
 							if !row.contains(&p) || !col.contains(&p) || !house.contains(&p) {
 								self.cell[i][j].digit = p;
-                                reset = true;
+								reset = true;
 								break 'outer;
 							}
 							k = k + 1;
@@ -494,14 +494,14 @@ fn main() {
 					//No possibilities mean the current board state is impossible to solve.
 					} else {
 
-                        //Only encountered if the board is unsolvable, which means it was entered incorrectly.
-                        if b_stack.len() == 1 {
+						//Only encountered if the board is unsolvable, which means it was entered incorrectly.
+						if b_stack.len() == 1 {
 							panic!("ERROR - Sudoku board not entered correctly.");
 						}
 
 						//Pop top of stack.
 						b_stack.remove(t);
-                        t = b_stack.len()-1;
+						t = b_stack.len()-1;
 
 						//Revert the last-modified cell to a 0 and update its p_limit list.
 						b_stack[t].cell[b.last_modified[0]][b.last_modified[1]].p_limit.push(b.last_modified[2] as u16);
