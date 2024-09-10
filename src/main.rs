@@ -48,86 +48,55 @@ impl Board {
 
 	//Initialize values of board from given input
 	fn init(&mut self, init: &Vec<Vec<u16>>) {
-		let mut i: usize = 0;
-		let mut j: usize = 0;
-		let mut k: usize = 0;
-		let mut l: usize;
 
 		let mut hx: usize;
 		let mut hy: usize;
 
 		//Initialize cells with their digits
-		while i < self.bsize {
+		for i in 0..self.bsize {
 			self.cell.push(Vec::new());
-			while j < self.bsize {
+			for j in 0.. self.bsize {
 				self.cell[i].push(Cell::new());
 				self.cell[i][j].digit = init[i][j];
-				j = j + 1;
 			}
-			j = 0;
-			i = i + 1;
 		}
-		i=0;
-		j=0;
 
 		//Initialize row and column coordinates
-		while i < self.bsize {
-			while j < self.bsize {
-				while k < self.bsize {
+		for i in 0..self.bsize {
+			for j in 0..self.bsize {
+				for k in 0..self.bsize {
 					if k != j {
 						self.cell[i][j].row.push([i,k]);
 					}
 					if k != i {
 						self.cell[i][j].col.push([k,j]);
 					}
-					k = k + 1;
 				}
-				k = 0;
-				j = j + 1;
 			}
-			j = 0;
-			i = i + 1;
 		}
 
-		i = 0;
-		j = 0;
-
 		//Initialize house coordinates
-		while i < self.bsize {
-			while j < self.bsize {
+		for i in 0..self.bsize {
+			for j in 0..self.bsize {
 
 				//Calculate top-left coordinate of cell's house.
 				hy = (((i/self.hsize) as f64).floor() as usize)*(self.hsize);
 				hx = (((j/self.hsize) as f64).floor() as usize)*(self.hsize);
 
-				k = 0;
-				l = 0;
-
 				//Iterate from top-left coordinate of house and add to cell's house.
-				while k < self.hsize {
-					while l < self.hsize {
+				for k in 0..self.hsize {
+					for l in 0..self.hsize {
 						if i != (k+hy) || j != (l+hx) {
 							self.cell[i][j].house.push([(k+hy),(l+hx)]);
 						}
-						
-						l = l + 1;
 					}
-					l = 0;
-					k = k + 1;
 				}
-				j = j + 1;
 			}
-			j = 0;
-			i = i + 1;
 		}
 	}
 
 	//Show current state of board
 	fn show(&self) {
-		let mut i = 0;
-		let mut j = 0;
-		let mut k = 0;
-		let mut l = 0;
 
 		let mut output = String::from("");
 
@@ -138,20 +107,18 @@ impl Board {
 		output.push_str("\n");
 
 		//Main loop
-		while i < self.bsize {
-			while j < self.bsize {
+		for i in 0..self.bsize {
+			for j in 0..self.bsize {
 
 				//Ensure enough white-space before digit.
 				if self.cell[i][j].digit != 0 {
-					while k < space_per_digit-(((self.cell[i][j].digit).checked_ilog10().unwrap_or(0)+2) as usize) {
+					for _ in 0..space_per_digit-(((self.cell[i][j].digit).checked_ilog10().unwrap_or(0)+2) as usize) {
 						output.push_str(" ");
-						k = k + 1;
 					}
 					output.push_str(&self.cell[i][j].digit.to_string());
 				} else {
-					while k < space_per_digit-1 {
+					for _ in 0..space_per_digit-1 {
 						output.push_str(" ");
-						k = k + 1;
 					}
 				}
 
@@ -161,29 +128,21 @@ impl Board {
 				} else {
 					output.push_str(" ");
 				}
-				k = 0;
-				j = j + 1;
 			}
 			output.push_str("\n");
 
 			//Add horizontal line when end of house is reached.
 			if (i+1) % self.hsize == 0 && (i+1) != (self.bsize) {
-				while k < self.hsize {
-					while l < (self.hsize*space_per_digit)-1 {
-						output.push_str("-");
-						l = l + 1;
+				for k in 0..self.hsize {
+					for _ in 0..(self.hsize*space_per_digit)-1 {
+						output.push_str("―");
 					}
 					if k != self.hsize-1 {
 						output.push_str("+");
 					}
-					l=0;
-					k = k + 1;
 				}
 				output.push_str("\n");
 			}
-			k = 0;
-			j = 0;
-			i = i + 1;
 		}
 
 		print!("{}", output);
@@ -212,25 +171,16 @@ impl Board {
 
 	//Updates the possibilities of all cells, restricted by p_limit.
 	fn update_all_p(&mut self) {
-		let mut i: usize;
-		let mut j: usize;
-		let mut k: usize;
-
 		let mut reset: bool = true;
-
 		let mut limit: Vec<u16> = vec![];
 
 		//Main loop
 		while reset == true {
 			reset = false;
 
-			i = 0;
-			j = 0;
-			k = 1;
-
 			//Iterate through cells
-			'outer: while i < self.bsize {
-				while j < self.bsize {
+			'outer: for i in 0..self.bsize {
+				for j in 0..self.bsize {
 
 					//Ensure cell is a 0
 					if self.cell[i][j].digit == 0 {
@@ -244,11 +194,10 @@ impl Board {
 						limit.append(&mut self.coords_to_digits(&self.cell[i][j].house, false));
 
 						//Assign all possibilities, restricted by limit and p_limit.
-						while k < (self.bsize+1) {
+						for k in 1..(self.bsize+1) {
 							if !limit.contains(&(k as u16)) && !self.cell[i][j].p_limit.contains(&(k as u16)) {
 								self.cell[i][j].p.push(k as u16);
 							}
-							k = k + 1;
 						}
 
 						//If there is only 1 possibility, set it as the digit and restart.
@@ -257,22 +206,14 @@ impl Board {
 							reset = true;
 							break 'outer;
 						}
-						k=1;
 					}
-					j = j + 1;
 				}
-				j = 0;
-				i = i + 1;
 			}
 		}
 	}
 
 	//Checks for lone-possibility's and updates all possibilities.
 	fn process_of_elimination(&mut self) {
-		let mut i: usize;
-		let mut j: usize;
-		let mut k: usize;
-
 		let mut p: u16; //Current cell's possibility
 		let mut row: Vec<u16>; //Current cell's row
 		let mut col: Vec<u16>; //Current cell's col
@@ -287,16 +228,12 @@ impl Board {
 			//Update all possibilities and fill-in lone-possibilities
 			self.update_all_p();
 
-			i = 0;
-			j = 0;
-			k = 0;
-
 			//Show board during calculation. (SUPER SLOWDOWN)
-			self.show();
+			//self.show();
 
 			//Iterate through cels
-			'outer: while i < self.bsize {
-				while j < self.bsize {
+			'outer: for i in 0..self.bsize {
+				for j in 0..self.bsize {
 
 					//Ensure cell is a 0
 					if self.cell[i][j].digit == 0 {
@@ -307,21 +244,16 @@ impl Board {
 						house = self.coords_to_digits(&self.cell[i][j].house, true);
 
 						//If area's do not contain a possibility, then set digit to possibility.
-						while k < self.cell[i][j].p.len() {
+                        for k in 0..self.cell[i][j].p.len() {
 							p = self.cell[i][j].p[k];
 							if !row.contains(&p) || !col.contains(&p) || !house.contains(&p) {
 								self.cell[i][j].digit = p;
 								reset = true;
 								break 'outer;
 							}
-							k = k + 1;
 						}
-						k = 0;
 					}
-					j = j + 1;
 				}
-				j = 0;
-				i = i + 1;
 			}
 		}
 	}
@@ -334,9 +266,6 @@ fn pause() {
 
 //Main code containing backtracking logic.
 fn main() {
-	let mut i: usize;
-	let mut j: usize;
-
 	println!("Press enter to begin.");
 	pause();
 
@@ -355,8 +284,8 @@ fn main() {
 			vec![0,0,0,0,3,0,1,0,0],
 			vec![7,6,0,2,0,0,5,0,8],
 			vec![4,2,0,0,6,8,9,1,0],
+            vec![0,0,3,1,0,0,2,5,0],
 			vec![0,0,0,1,0,0,6,8,7]];
-			vec![0,0,3,1,0,0,2,5,0],
 
 		//Extreme difficulty
 		let init = vec![
@@ -436,16 +365,15 @@ fn main() {
 	//The sudoku board to solve.
 	//Rated 11.9 difficulty
 	let init = vec![
-		vec![1,2,0,3,0,0,0,0,0],
-		vec![4,0,0,0,0,0,3,0,0],
-		vec![0,0,3,0,5,0,0,0,0],
-		vec![0,0,4,2,0,0,5,0,0],
-		vec![0,0,0,0,8,0,0,0,9],
-		vec![0,6,0,0,0,5,0,7,0],
-		vec![0,0,1,5,0,0,2,0,0],
-		vec![0,0,0,0,9,0,0,6,0],
-		vec![0,0,0,0,0,7,0,0,8]];
-
+			vec![0,4,5,8,7,0,9,0,0],
+			vec![0,0,0,9,0,0,0,0,0],
+			vec![2,0,8,0,6,0,0,0,4],
+			vec![0,1,0,2,0,0,4,0,0],
+			vec![9,3,0,5,4,7,2,0,0],
+			vec![0,0,4,6,9,0,7,0,3],
+			vec![0,6,0,4,8,0,0,3,1],
+            vec![3,8,0,7,0,2,6,0,9],
+			vec![0,0,0,0,0,6,0,2,7]];
 
 	let mut b = Board::new(init.len()); //The main board
 	let mut b_stack: Vec<Board> = vec![]; //The stack of boards
@@ -464,12 +392,9 @@ fn main() {
 		//Update temporary board
 		b = b_stack[t].clone();
 
-		i = 0;
-		j = 0;
-
 		//Iterate through cells
-		'outer: while i < b.bsize {
-			while j < b.bsize {
+		'outer: for i in 0..b.bsize {
+			for j in 0..b.bsize {
 
 				//Ensure cell is a 0
 				if b.cell[i][j].digit == 0 {
@@ -514,10 +439,7 @@ fn main() {
 						break 'outer;
 					}
 				}
-				j = j + 1;
 			}
-			j = 0;
-			i = i + 1;
 		}
 	}
 
