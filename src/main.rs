@@ -196,17 +196,11 @@ impl Board {
 		for each in &self.cell[c[0]][c[1]].aoe.clone() {
 			if self.cell[each[0]][each[1]].digit == 0 {
 
-				limit.clear();
+				//limit.clear();
 				self.cell[each[0]][each[1]].p.clear();
-
-				//Update limits of current cell
-				limit.append(&mut self.coords_to_digits(&self.cell[each[0]][each[1]].row, false));
-				limit.append(&mut self.coords_to_digits(&self.cell[each[0]][each[1]].col, false));
-				limit.append(&mut self.coords_to_digits(&self.cell[each[0]][each[1]].house, false));
-
 				//Assign all possibilities, restricted by limit and p_limit.
 				for k in 1..(self.bsize+1) {
-					if !limit.contains(&(k as u16)) && !self.cell[each[0]][each[1]].p_limit.contains(&(k as u16)) {
+					if !self.coords_to_digits(&self.cell[each[0]][each[1]].house, false).contains(&(k as u16)) && !self.coords_to_digits(&self.cell[each[0]][each[1]].col, false).contains(&(k as u16)) && !self.coords_to_digits(&self.cell[each[0]][each[1]].row, false).contains(&(k as u16)) && !self.cell[each[0]][each[1]].p_limit.contains(&(k as u16)) {
 						self.cell[each[0]][each[1]].p.push(k as u16);
 					}
 				}
@@ -231,17 +225,11 @@ impl Board {
 				//Ensure cell is a 0
 				if self.cell[i][j].digit == 0 {
 
-					limit.clear();
 					self.cell[i][j].p.clear();
-
-					//Update limits of current cell
-					limit.append(&mut self.coords_to_digits(&self.cell[i][j].row, false));
-					limit.append(&mut self.coords_to_digits(&self.cell[i][j].col, false));
-					limit.append(&mut self.coords_to_digits(&self.cell[i][j].house, false));
 
 					//Assign all possibilities, restricted by limit and p_limit.
 					for k in 1..(self.bsize+1) {
-						if !limit.contains(&(k as u16)) && !self.cell[i][j].p_limit.contains(&(k as u16)) {
+						if !self.coords_to_digits(&self.cell[i][j].house, false).contains(&(k as u16)) && !self.coords_to_digits(&self.cell[i][j].col, false).contains(&(k as u16)) && !self.coords_to_digits(&self.cell[i][j].row, false).contains(&(k as u16)) && !self.cell[i][j].p_limit.contains(&(k as u16)) {
 							self.cell[i][j].p.push(k as u16);
 						}
 					}
@@ -274,15 +262,10 @@ impl Board {
 				//Ensure cell is a 0
 				if self.cell[i][j].digit == 0 {
 
-					//Save all possibility's in area of cell
-					row = self.coords_to_digits(&self.cell[i][j].row, true);
-					col = self.coords_to_digits(&self.cell[i][j].col, true);
-					house = self.coords_to_digits(&self.cell[i][j].house, true);
-
 					//If area's do not contain a possibility, then set digit to possibility.
 					for k in 0..self.cell[i][j].p.len() {
 						p = self.cell[i][j].p[k];
-						if !row.contains(&p) || !col.contains(&p) || !house.contains(&p) {
+						if !self.coords_to_digits(&self.cell[i][j].row, true).contains(&p) || !self.coords_to_digits(&self.cell[i][j].col, true).contains(&p) || !self.coords_to_digits(&self.cell[i][j].house, true).contains(&p) {
 							self.cell[i][j].digit = p;
 							self.update_p([i, j]);
 							//reset = false;
@@ -519,15 +502,15 @@ fn main() {
 
 		//The sudoku board to solve.
 		let init = vec![
-				vec![0,0,7,6,0,5,9,4,0],
-				vec![0,0,0,0,0,0,0,0,6],
-				vec![8,0,0,1,0,0,0,0,0],
-				vec![0,0,0,0,0,0,2,0,0],
-				vec![0,7,0,0,9,0,0,0,0],
-				vec![0,0,9,0,0,4,5,3,0],
-				vec![0,1,0,5,0,0,3,6,0],
-				vec![0,0,0,0,0,6,0,0,7],
-				vec![0,0,3,0,0,0,0,0,2]];
+				vec![0,4,5,8,7,0,9,0,0],
+				vec![0,0,0,9,0,0,0,0,0],
+				vec![2,0,8,0,6,0,0,0,4],
+				vec![0,1,0,2,0,0,4,0,0],
+				vec![9,3,0,5,4,7,2,0,0],
+				vec![0,0,4,6,9,0,7,0,3],
+				vec![0,6,0,4,8,0,0,3,1],
+				vec![3,8,0,7,0,2,6,0,9],
+				vec![0,0,0,0,0,6,0,2,7]];
 
 		b = Board::new(init.len()); //The main board
 		b_stack = vec![]; //The stack of boards
@@ -535,6 +518,9 @@ fn main() {
 		b.init(&init); //Initialize cells and area coordinates
 		b.update_all_p();
 		b.process_of_elimination(); //Possibilities initialization
+		//b.show();
+		/*
+		pause();
 		b_stack.push(b.clone()); //Push first unsolved board to stack.
 
 		t = &b_stack.len()-1; //Top of the stack of boards
@@ -597,13 +583,14 @@ fn main() {
 				}
 			}
 		}
-
+		*/
 		duration = start.elapsed();
 
 		final_avg += duration.as_secs_f64() * 1000.0;
 	}
 	//Show the solved board
-	b_stack[t].show();
+	//b_stack[t].show();
+	b.show();
 	final_avg = final_avg/(num_of_loop as f64);
 	println!("{}", final_avg);
 	pause();
