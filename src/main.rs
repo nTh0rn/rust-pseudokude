@@ -1,6 +1,39 @@
 use std::process::Command;
-use std::io;
 use std::time::{Instant};
+use colored::Colorize;
+extern crate winapi;
+
+use std::ptr;
+use std::io::{self, Write};
+use winapi::um::consoleapi::GetConsoleMode;
+use winapi::um::consoleapi::SetConsoleMode;
+use winapi::um::processenv::GetStdHandle;
+use winapi::um::winbase::STD_OUTPUT_HANDLE;
+use winapi::um::wincon::ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+
+fn enable_virtual_terminal_processing() -> io::Result<()> {
+    unsafe {
+        // Get the handle to the standard output (console)
+        let stdout_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if stdout_handle == ptr::null_mut() {
+            return Err(io::Error::last_os_error());
+        }
+
+        // Get the current console mode
+        let mut mode: u32 = 0;
+        if GetConsoleMode(stdout_handle, &mut mode) == 0 {
+            return Err(io::Error::last_os_error());
+        }
+
+        // Enable ENABLE_VIRTUAL_TERMINAL_PROCESSING flag
+        mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+        if SetConsoleMode(stdout_handle, mode) == 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+
+    Ok(())
+}
 
 //Individual cell holding all aoe information.
 #[derive(Clone)]
@@ -12,6 +45,8 @@ pub struct Cell {
 	aoe: Vec<[usize; 2]>, //Coordinates of cell's aoe
 	p: Vec<u16>, //Possibilities of current cell
 	p_limit: Vec<u16>, //Restrictions on possibilities
+	was_empty: bool,
+	known: bool,
 }
 impl Cell {
 
@@ -25,6 +60,8 @@ impl Cell {
 			aoe: vec![],
 			p: vec![],
 			p_limit: vec![],
+			was_empty: false,
+			known: false,
 		}
 	}
 }
@@ -36,6 +73,7 @@ pub struct Board {
 	hsize: usize, //House side-length
 	last_modified: [usize; 3], //Information about the last-modified cell.
 	cell: Vec<Vec<Cell>>, //2D vector containing all cells
+	solved: bool,
 }
 impl Board {
 
@@ -46,6 +84,7 @@ impl Board {
 			hsize: (bsize as f64).sqrt() as usize,
 			last_modified: [0,0,0],
 			cell: vec![],
+			solved: true,
 		}
 	}
 
@@ -69,6 +108,10 @@ impl Board {
 
 				//Assign digit to cell
 				self.cell[i][j].digit = init[i][j];
+
+				if self.cell[i][j].digit == 0 {
+					self.cell[i][j].was_empty = true;
+				}
 
 				//Initialize row and column coordinates
 				for k in 0..self.bsize {
@@ -135,7 +178,17 @@ impl Board {
 					for _ in 0..space_per_digit-(((self.cell[i][j].digit).checked_ilog10().unwrap_or(0)+2) as usize) {
 						output.push_str(" ");
 					}
-					output.push_str(&self.cell[i][j].digit.to_string());
+					if self.cell[i][j].known == true {
+						output.push_str(&format!("{}", self.cell[i][j].digit.to_string().green()));
+					} else if self.cell[i][j].was_empty == true && (i*9+j) < (self.last_modified[0]*9+self.last_modified[1]) {
+						output.push_str(&format!("{}", self.cell[i][j].digit.to_string().yellow()));
+					} else if i == self.last_modified[0] && j == self.last_modified[1] {
+						output.push_str(&format!("{}", self.cell[i][j].digit.to_string().cyan()));
+					} else if self.cell[i][j].was_empty == true {
+						output.push_str(&format!("{}", self.cell[i][j].digit.to_string().red()));
+					} else {
+						output.push_str(&format!("{}", self.cell[i][j].digit.to_string()));
+					}
 				} else {
 					for _ in 0..space_per_digit-1 {
 						output.push_str(" ");
@@ -177,8 +230,10 @@ impl Board {
 
 			//Whether to return area's digits or all of area's possibilities
 			if return_p {
-				for each in &self.cell[each[0]][each[1]].p {
-					output.push(*each);
+				if self.cell[each[0]][each[1]].digit == 0 {
+					for each in &self.cell[each[0]][each[1]].p {
+						output.push(*each);
+					}
 				}
 			} else {
 				if self.cell[each[0]][each[1]].digit != 0 {
@@ -191,22 +246,31 @@ impl Board {
 
 	//Updates the possibilities of all cells, restricted by p_limit.
 	fn update_p(&mut self, c: [usize; 2]) {
-		let mut limit: Vec<u16> = vec![];
+		let mut row: Vec<u16>; //Current cell's row
+		let mut col: Vec<u16>; //Current cell's col
+		let mut house: Vec<u16>; //Current cell's house
+		let mut p_len: u16;
 		
 		for each in &self.cell[c[0]][c[1]].aoe.clone() {
 			if self.cell[each[0]][each[1]].digit == 0 {
 
-				//limit.clear();
+				p_len = 0;
 				self.cell[each[0]][each[1]].p.clear();
+
 				//Assign all possibilities, restricted by limit and p_limit.
+				row = self.coords_to_digits(&self.cell[each[0]][each[1]].row, false);
+				col = self.coords_to_digits(&self.cell[each[0]][each[1]].col, false);
+				house = self.coords_to_digits(&self.cell[each[0]][each[1]].house, false);
+
 				for k in 1..(self.bsize+1) {
-					if !self.coords_to_digits(&self.cell[each[0]][each[1]].house, false).contains(&(k as u16)) && !self.coords_to_digits(&self.cell[each[0]][each[1]].col, false).contains(&(k as u16)) && !self.coords_to_digits(&self.cell[each[0]][each[1]].row, false).contains(&(k as u16)) && !self.cell[each[0]][each[1]].p_limit.contains(&(k as u16)) {
+					if !row.contains(&(k as u16)) && !col.contains(&(k as u16)) && !house.contains(&(k as u16)) && !self.cell[each[0]][each[1]].p_limit.contains(&(k as u16)) {
 						self.cell[each[0]][each[1]].p.push(k as u16);
+						p_len += 1;
 					}
 				}
 
 				//If there is only 1 possibility, set it as the digit and restart.
-				if self.cell[each[0]][each[1]].p.len() == 1 {
+				if p_len == 1 {
 					self.cell[each[0]][each[1]].digit = self.cell[each[0]][each[1]].p[0];
 					self.update_p([each[0], each[1]]);
 				}
@@ -216,28 +280,27 @@ impl Board {
 
 	//Updates the possibilities of all cells, restricted by p_limit.
 	fn update_all_p(&mut self) {
-		let mut limit: Vec<u16> = vec![];
+		let mut row: Vec<u16>; //Current cell's row
+		let mut col: Vec<u16>; //Current cell's col
+		let mut house: Vec<u16>; //Current cell's house
 		
 		//Iterate through cells
 		for i in 0..self.bsize {
 			for j in 0..self.bsize {
-
 				//Ensure cell is a 0
 				if self.cell[i][j].digit == 0 {
 
 					self.cell[i][j].p.clear();
 
+					row = self.coords_to_digits(&self.cell[i][j].row, false);
+					col = self.coords_to_digits(&self.cell[i][j].col, false);
+					house = self.coords_to_digits(&self.cell[i][j].house, false);
+
 					//Assign all possibilities, restricted by limit and p_limit.
 					for k in 1..(self.bsize+1) {
-						if !self.coords_to_digits(&self.cell[i][j].house, false).contains(&(k as u16)) && !self.coords_to_digits(&self.cell[i][j].col, false).contains(&(k as u16)) && !self.coords_to_digits(&self.cell[i][j].row, false).contains(&(k as u16)) && !self.cell[i][j].p_limit.contains(&(k as u16)) {
+						if !row.contains(&(k as u16)) && !col.contains(&(k as u16)) && !house.contains(&(k as u16)) && !self.cell[i][j].p_limit.contains(&(k as u16)) {
 							self.cell[i][j].p.push(k as u16);
 						}
-					}
-
-					//If there is only 1 possibility, set it as the digit and restart.
-					if self.cell[i][j].p.len() == 1 {
-						self.cell[i][j].digit = self.cell[i][j].p[0];
-						self.update_p([i,j]);
 					}
 				}
 			}
@@ -245,38 +308,46 @@ impl Board {
 		
 	}
 
+	
 	//Checks for lone-possibility's and updates all possibilities.
 	fn process_of_elimination(&mut self) {
 		let mut p: u16; //Current cell's possibility
 		let mut row: Vec<u16>; //Current cell's row
 		let mut col: Vec<u16>; //Current cell's col
 		let mut house: Vec<u16>; //Current cell's house
+		let mut reset: bool = true;
 
 		//Show board during calculation. (SUPER SLOWDOWN)
 		//self.show();
 
-		//Iterate through cells
-		for i in 0..self.bsize {
-			for j in 0..self.bsize {
+		while reset {
+			self.solved = true;
+			reset = false;
+			for i in 0..self.bsize {
+				for j in 0..self.bsize {
+					//Ensure cell is a 0
+					if self.cell[i][j].digit == 0 {
+						self.solved = false;
+						row = self.coords_to_digits(&self.cell[i][j].row, true);
+						col = self.coords_to_digits(&self.cell[i][j].col, true);
+						house = self.coords_to_digits(&self.cell[i][j].house, true);
 
-				//Ensure cell is a 0
-				if self.cell[i][j].digit == 0 {
-
-					//If area's do not contain a possibility, then set digit to possibility.
-					for k in 0..self.cell[i][j].p.len() {
-						p = self.cell[i][j].p[k];
-						if !self.coords_to_digits(&self.cell[i][j].row, true).contains(&p) || !self.coords_to_digits(&self.cell[i][j].col, true).contains(&p) || !self.coords_to_digits(&self.cell[i][j].house, true).contains(&p) {
-							self.cell[i][j].digit = p;
-							self.update_p([i, j]);
-							//reset = false;
+						//If area's do not contain a possibility, then set digit to possibility.
+						for k in 0..self.cell[i][j].p.len() {
+							p = self.cell[i][j].p[k];
+							if !row.contains(&p) || !col.contains(&p) || !house.contains(&p) {
+								self.cell[i][j].digit = p;
+								self.update_p([i, j]);
+								reset = true;
+							}
 						}
 					}
 				}
 			}
 		}
-		
 	}
 }
+
 
 //Wait for user input, just invokes Batch pause>nul.
 fn pause() {
@@ -285,10 +356,14 @@ fn pause() {
 
 //Main code containing backtracking logic.
 fn main() {
-	println!("How many iterations?");
+	if let Err(e) = enable_virtual_terminal_processing() {
+        writeln!(io::stderr(), "Error enabling virtual terminal processing: {}", e).unwrap();
+    } else {
+        println!("Virtual terminal processing enabled!");
+    }
 	let mut final_avg: f64 = 0.0;
 
-	let init = vec![
+	let mut init = vec![
 		vec![0, 4, 5, 8, 7, 0, 9, 0, 0],
 		vec![0, 0, 0, 9, 0, 0, 0, 0, 0],
 		vec![2, 0, 8, 0, 6, 0, 0, 0, 4],
@@ -306,7 +381,6 @@ fn main() {
 	b.process_of_elimination(); //Possibilities initialization
 	b_stack.push(b.clone()); //Push first unsolved board to stack.
 
-	let mut t: usize = &b_stack.len()-1; //Top of the stack of boards
 	let mut reset: bool; //Whether or not to reset if the board isn't solved yet.
 
 	b_stack.clear();
@@ -340,6 +414,18 @@ fn main() {
 				vec![0,6,0,4,8,0,0,3,1],
 				vec![3,8,0,7,0,2,6,0,9],
 				vec![0,0,0,0,0,6,0,2,7]];
+
+			//Master difficulty
+			let init = vec![
+				vec![0,0,0,0,0,0,0,0,0],
+				vec![0,0,4,1,6,2,9,0,0],
+				vec![2,0,0,0,3,0,0,7,0],
+				vec![0,9,0,0,0,0,0,6,3],
+				vec![0,0,0,0,0,0,0,0,0],
+				vec![0,6,0,0,1,3,0,0,7],
+				vec![9,0,6,0,0,5,0,0,0],
+				vec![8,5,0,7,0,6,4,0,0],
+				vec![0,7,0,0,0,0,0,2,0]];
 
 			//Extreme difficulty
 			let init = vec![
@@ -502,15 +588,15 @@ fn main() {
 
 		//The sudoku board to solve.
 		let init = vec![
-				vec![0,0,7,6,0,5,9,4,0],
-				vec![0,0,0,0,0,0,0,0,6],
-				vec![8,0,0,1,0,0,0,0,0],
-				vec![0,0,0,0,0,0,2,0,0],
-				vec![0,7,0,0,9,0,0,0,0],
-				vec![0,0,9,0,0,4,5,3,0],
-				vec![0,1,0,5,0,0,3,6,0],
-				vec![0,0,0,0,0,6,0,0,7],
-				vec![0,0,3,0,0,0,0,0,2]];
+				vec![8,0,0,0,0,0,0,0,0],
+				vec![0,0,3,6,0,0,0,0,0],
+				vec![0,7,0,0,9,0,2,0,0],
+				vec![0,5,0,0,0,7,0,0,0],
+				vec![0,0,0,0,4,5,7,0,0],
+				vec![0,0,0,1,0,0,0,3,0],
+				vec![0,0,1,0,0,0,0,6,8],
+				vec![0,0,8,5,0,0,0,1,0],
+				vec![0,9,0,0,0,0,4,0,0]];
 
 		b = Board::new(init.len()); //The main board
 		b_stack = vec![]; //The stack of boards
@@ -518,20 +604,19 @@ fn main() {
 		b.init(&init); //Initialize cells and area coordinates
 		b.update_all_p();
 		b.process_of_elimination(); //Possibilities initialization
+		
 		//b.show();
-		/*
-		pause();
+		
 		b_stack.push(b.clone()); //Push first unsolved board to stack.
 
-		t = &b_stack.len()-1; //Top of the stack of boards
 		reset = true; //Whether or not to reset if the board isn't solved yet.
 
 		//Main back-tracking loop
-		while reset == true {
+		while reset == true && b.solved == false {
 			reset = false;
 
 			//Update temporary board
-			b = b_stack[t].clone();
+			b = b_stack.last_mut().unwrap().clone();
 
 			//Iterate through cells
 			'outer: for i in 0..b.bsize {
@@ -545,6 +630,9 @@ fn main() {
 
 							//Set cell to first possibility and update the last-modified cell data.
 							b.cell[i][j].digit = b.cell[i][j].p[0];
+							if b.cell[i][j].p.len() == 1 {
+								b.cell[i][j].known = true;
+							}
 							b.last_modified = [i, j, b.cell[i][j].p[0] as usize];
 							b.update_p([i, j]);
 							//Update all possibilities and check for lone-possibilities in rows/cols/houses.
@@ -552,29 +640,28 @@ fn main() {
 							
 							//Push board to stack
 							b_stack.push(b.clone());
-							t = b_stack.len()-1;
-							b = b_stack[t].clone();
+							b = b_stack.last_mut().unwrap().clone();
 
 						//No possibilities mean the current board state is impossible to solve.
 						} else {
 
 							//Only encountered if the board is unsolvable, which means it was entered incorrectly.
-							if b_stack.len() == 1 {
-								panic!("ERROR - Sudoku board not entered correctly.");
-							}
+							//if b_stack.len() == 1 {
+							//	panic!("ERROR - Sudoku board not entered correctly.");
+							//}
 
 							//Pop top of stack.
-							b_stack.remove(t);
-							t = b_stack.len()-1;
+							b_stack.pop();
 
 							//Revert the last-modified cell to a 0 and update its p_limit list.
-							b_stack[t].cell[b.last_modified[0]][b.last_modified[1]].p_limit.push(b.last_modified[2] as u16);
-							b_stack[t].cell[b.last_modified[0]][b.last_modified[1]].digit = 0;
+							b_stack.last_mut().unwrap().cell[b.last_modified[0]][b.last_modified[1]].p_limit.push(b.last_modified[2] as u16);
+							b_stack.last_mut().unwrap().cell[b.last_modified[0]][b.last_modified[1]].digit = 0;
 							
-							b_stack[t].update_all_p();
+							b_stack.last_mut().unwrap().update_all_p();
+							//b_stack.last_mut().unwrap().update_p([b.last_modified[0], b.last_modified[1]]);
 							
 							//Update all possibilities and check for lone-possibilities in rows/cols/houses.
-							b_stack[t].process_of_elimination();
+							b_stack.last_mut().unwrap().process_of_elimination();
 							
 							reset = true;
 							break 'outer;
@@ -583,14 +670,14 @@ fn main() {
 				}
 			}
 		}
-		*/
+		
 		duration = start.elapsed();
 
 		final_avg += duration.as_secs_f64() * 1000.0;
 	}
 	//Show the solved board
-	//b_stack[t].show();
-	b.show();
+	b_stack.last_mut().unwrap().show();
+	//b.show();
 	final_avg = final_avg/(num_of_loop as f64);
 	println!("{}", final_avg);
 	pause();
