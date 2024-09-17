@@ -1,39 +1,6 @@
 use std::process::Command;
 use std::time::{Instant};
-use colored::Colorize;
-extern crate winapi;
-
-use std::ptr;
-use std::io::{self, Write};
-use winapi::um::consoleapi::GetConsoleMode;
-use winapi::um::consoleapi::SetConsoleMode;
-use winapi::um::processenv::GetStdHandle;
-use winapi::um::winbase::STD_OUTPUT_HANDLE;
-use winapi::um::wincon::ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-
-fn enable_virtual_terminal_processing() -> io::Result<()> {
-    unsafe {
-        // Get the handle to the standard output (console)
-        let stdout_handle = GetStdHandle(STD_OUTPUT_HANDLE);
-        if stdout_handle == ptr::null_mut() {
-            return Err(io::Error::last_os_error());
-        }
-
-        // Get the current console mode
-        let mut mode: u32 = 0;
-        if GetConsoleMode(stdout_handle, &mut mode) == 0 {
-            return Err(io::Error::last_os_error());
-        }
-
-        // Enable ENABLE_VIRTUAL_TERMINAL_PROCESSING flag
-        mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-        if SetConsoleMode(stdout_handle, mode) == 0 {
-            return Err(io::Error::last_os_error());
-        }
-    }
-
-    Ok(())
-}
+use std::io::{self};
 
 //Individual cell holding all aoe information.
 #[derive(Clone)]
@@ -45,8 +12,6 @@ pub struct Cell {
 	aoe: Vec<[usize; 2]>, //Coordinates of cell's aoe
 	p: Vec<u16>, //Possibilities of current cell
 	p_limit: Vec<u16>, //Restrictions on possibilities
-	was_empty: bool,
-	known: bool,
 }
 impl Cell {
 
@@ -60,8 +25,6 @@ impl Cell {
 			aoe: vec![],
 			p: vec![],
 			p_limit: vec![],
-			was_empty: false,
-			known: false,
 		}
 	}
 }
@@ -108,10 +71,6 @@ impl Board {
 
 				//Assign digit to cell
 				self.cell[i][j].digit = init[i][j];
-
-				if self.cell[i][j].digit == 0 {
-					self.cell[i][j].was_empty = true;
-				}
 
 				//Initialize row and column coordinates
 				for k in 0..self.bsize {
@@ -178,17 +137,7 @@ impl Board {
 					for _ in 0..space_per_digit-(((self.cell[i][j].digit).checked_ilog10().unwrap_or(0)+2) as usize) {
 						output.push_str(" ");
 					}
-					if self.cell[i][j].known == true {
-						output.push_str(&format!("{}", self.cell[i][j].digit.to_string().green()));
-					} else if self.cell[i][j].was_empty == true && (i*9+j) < (self.last_modified[0]*9+self.last_modified[1]) {
-						output.push_str(&format!("{}", self.cell[i][j].digit.to_string().yellow()));
-					} else if i == self.last_modified[0] && j == self.last_modified[1] {
-						output.push_str(&format!("{}", self.cell[i][j].digit.to_string().cyan()));
-					} else if self.cell[i][j].was_empty == true {
-						output.push_str(&format!("{}", self.cell[i][j].digit.to_string().red()));
-					} else {
-						output.push_str(&format!("{}", self.cell[i][j].digit.to_string()));
-					}
+					output.push_str(&format!("{}", self.cell[i][j].digit.to_string()));
 				} else {
 					for _ in 0..space_per_digit-1 {
 						output.push_str(" ");
@@ -206,7 +155,7 @@ impl Board {
 
 			//Add horizontal line when end of house is reached.
 			if (i+1) % self.hsize == 0 && (i+1) != (self.bsize) {
-				for k in 0..self.hsize {
+				for k in 0..self.hsize { 
 					for _ in 0..(self.hsize*space_per_digit)-1 {
 						output.push_str("―");
 					}
@@ -356,11 +305,6 @@ fn pause() {
 
 //Main code containing backtracking logic.
 fn main() {
-	if let Err(e) = enable_virtual_terminal_processing() {
-        writeln!(io::stderr(), "Error enabling virtual terminal processing: {}", e).unwrap();
-    } else {
-        println!("Virtual terminal processing enabled!");
-    }
 	let mut final_avg: f64 = 0.0;
 
 	let mut init = vec![
@@ -587,16 +531,16 @@ fn main() {
 		*/
 
 		//The sudoku board to solve.
-		let init = vec![
-				vec![8,0,0,0,0,0,0,0,0],
-				vec![0,0,3,6,0,0,0,0,0],
-				vec![0,7,0,0,9,0,2,0,0],
-				vec![0,5,0,0,0,7,0,0,0],
-				vec![0,0,0,0,4,5,7,0,0],
-				vec![0,0,0,1,0,0,0,3,0],
-				vec![0,0,1,0,0,0,0,6,8],
-				vec![0,0,8,5,0,0,0,1,0],
-				vec![0,9,0,0,0,0,4,0,0]];
+		init = vec![
+				vec![1,2,0,3,0,0,0,0,0],
+				vec![4,0,0,0,0,0,3,0,0],
+				vec![0,0,3,0,5,0,0,0,0],
+				vec![0,0,4,2,0,0,5,0,0],
+				vec![0,0,0,0,8,0,0,0,9],
+				vec![0,6,0,0,0,5,0,7,0],
+				vec![0,0,1,5,0,0,2,0,0],
+				vec![0,0,0,0,9,0,0,6,0],
+				vec![0,0,0,0,0,7,0,0,8]];
 
 		b = Board::new(init.len()); //The main board
 		b_stack = vec![]; //The stack of boards
@@ -630,9 +574,6 @@ fn main() {
 
 							//Set cell to first possibility and update the last-modified cell data.
 							b.cell[i][j].digit = b.cell[i][j].p[0];
-							if b.cell[i][j].p.len() == 1 {
-								b.cell[i][j].known = true;
-							}
 							b.last_modified = [i, j, b.cell[i][j].p[0] as usize];
 							b.update_p([i, j]);
 							//Update all possibilities and check for lone-possibilities in rows/cols/houses.
