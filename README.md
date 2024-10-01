@@ -58,7 +58,7 @@ Psuedokude is a dynamic sudoku solver that can solve boards of any size up to a 
 
 1. Clone/download the repo
    ```sh
-   git clone https://github.com/nTh0rn/fast-random-pathfinder.git
+   git clone https://github.com/nTh0rn/rust-pseudokude.git
    ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
