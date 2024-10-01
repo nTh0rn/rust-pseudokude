@@ -1,5 +1,6 @@
 use std::process::Command;
 use std::time::{Instant};
+
 use colored::Colorize;
 extern crate winapi;
 
@@ -169,6 +170,12 @@ impl Board {
 		
 		print!("{esc}[2J{esc}[1;1H", esc = 27 as char);
 		output.push_str("\n");
+
+		output.push_str(&format!("{} - Original puzzle\n", "White\t"));
+		output.push_str(&format!("{} - Solved by possibility-analysis\n", "Red\t".red()));
+		output.push_str(&format!("{} - Current backtracking cell\n", "Blue\t".cyan()));
+		output.push_str(&format!("{} - Solved by backtracking, other possibilities still exist\n", "Yellow\t".yellow()));
+		output.push_str(&format!("{} - Solved by backtracking, no more possibilities exist\n\n", "Green\t".green()));
 
 		//Main loop
 		for i in 0..self.bsize {
@@ -364,22 +371,15 @@ fn main() {
     }
 
 	let init = vec![
-		vec![13,0,0,0,0,10,0,0,6,0,0,0,0,11,0,0],
-		vec![14,3,0,0,0,12,0,9,10,0,0,0,16,0,0,0],
-		vec![0,9,0,0,0,0,1,0,0,0,15,13,8,0,0,12],
-		vec![0,0,0,15,16,0,14,8,4,0,0,0,10,3,2,0],
-		vec![0,0,13,8,15,0,3,0,1,2,6,0,0,16,0,0],
-		vec![0,0,0,0,5,1,6,0,7,0,3,4,0,12,0,0],
-		vec![6,0,0,11,0,2,0,0,0,13,0,15,0,0,0,0],
-		vec![3,0,12,0,0,0,13,0,0,0,5,11,1,0,6,15],
-		vec![0,1,0,13,6,3,0,0,0,0,0,0,2,0,16,0],
-		vec![10,0,0,0,0,0,9,0,8,0,4,16,3,13,0,0],
-		vec![0,11,2,0,7,8,0,16,0,10,13,0,0,0,15,4],
-		vec![12,0,0,14,11,15,0,13,0,0,2,7,5,0,0,0],
-		vec![7,8,0,0,9,0,0,2,0,11,0,10,12,0,0,0],
-		vec![9,0,3,0,0,13,0,0,15,0,0,14,0,0,0,0],
-		vec![0,10,0,1,0,11,0,3,0,0,0,0,0,8,7,0],
-		vec![0,0,15,12,10,0,5,0,2,7,0,0,0,0,9,16]];
+				vec![0,0,0,0,0,0,0,0,0],
+				vec![4,0,0,0,0,0,3,0,0],
+				vec![0,0,0,0,5,0,0,0,0],
+				vec![0,0,4,2,0,0,5,0,0],
+				vec![0,0,0,0,8,0,0,0,9],
+				vec![0,6,0,0,0,5,0,7,0],
+				vec![0,0,1,5,0,0,2,0,0],
+				vec![0,0,0,0,9,0,0,6,0],
+				vec![0,0,0,0,0,7,0,0,8]];
 
 	let mut b = Board::new(init.len()); //The main board
 	let mut b_stack: Vec<Board> = vec![]; //The stack of boards
