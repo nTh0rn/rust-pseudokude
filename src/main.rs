@@ -1,6 +1,40 @@
 use std::process::Command;
 use std::time::{Instant};
-use std::io::{self};
+use colored::Colorize;
+extern crate winapi;
+
+use std::ptr;
+use std::io::{self, Write};
+use winapi::um::consoleapi::GetConsoleMode;
+use winapi::um::consoleapi::SetConsoleMode;
+use winapi::um::processenv::GetStdHandle;
+use winapi::um::winbase::STD_OUTPUT_HANDLE;
+use winapi::um::wincon::ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+
+//Used to allow color printing
+fn enable_virtual_terminal_processing() -> io::Result<()> {
+    unsafe {
+        // Get the handle to the standard output (console)
+        let stdout_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if stdout_handle == ptr::null_mut() {
+            return Err(io::Error::last_os_error());
+        }
+
+        // Get the current console mode
+        let mut mode: u32 = 0;
+        if GetConsoleMode(stdout_handle, &mut mode) == 0 {
+            return Err(io::Error::last_os_error());
+        }
+
+        // Enable ENABLE_VIRTUAL_TERMINAL_PROCESSING flag
+        mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+        if SetConsoleMode(stdout_handle, mode) == 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+
+    Ok(())
+}
 
 //Individual cell holding all aoe information.
 #[derive(Clone)]
@@ -12,6 +46,8 @@ pub struct Cell {
 	aoe: Vec<[usize; 2]>, //Coordinates of cell's aoe
 	p: Vec<u16>, //Possibilities of current cell
 	p_limit: Vec<u16>, //Restrictions on possibilities
+	was_empty: bool,
+	known: bool,
 }
 impl Cell {
 
@@ -25,6 +61,8 @@ impl Cell {
 			aoe: vec![],
 			p: vec![],
 			p_limit: vec![],
+			was_empty: false,
+			known: false,
 		}
 	}
 }
@@ -71,6 +109,10 @@ impl Board {
 
 				//Assign digit to cell
 				self.cell[i][j].digit = init[i][j];
+
+				if self.cell[i][j].digit == 0 {
+					self.cell[i][j].was_empty = true;
+				}
 
 				//Initialize row and column coordinates
 				for k in 0..self.bsize {
@@ -137,7 +179,19 @@ impl Board {
 					for _ in 0..space_per_digit-(((self.cell[i][j].digit).checked_ilog10().unwrap_or(0)+2) as usize) {
 						output.push_str(" ");
 					}
-					output.push_str(&format!("{}", self.cell[i][j].digit.to_string()));
+
+					//Color cell depending on if it was solved via backtracking or possibility elimination.
+					if self.cell[i][j].known == true {
+						output.push_str(&format!("{}", self.cell[i][j].digit.to_string().green()));
+					} else if self.cell[i][j].was_empty == true && (i*9+j) < (self.last_modified[0]*9+self.last_modified[1]) {
+						output.push_str(&format!("{}", self.cell[i][j].digit.to_string().yellow()));
+					} else if i == self.last_modified[0] && j == self.last_modified[1] {
+						output.push_str(&format!("{}", self.cell[i][j].digit.to_string().cyan()));
+					} else if self.cell[i][j].was_empty == true {
+						output.push_str(&format!("{}", self.cell[i][j].digit.to_string().red()));
+					} else {
+						output.push_str(&format!("{}", self.cell[i][j].digit.to_string()));
+					}
 				} else {
 					for _ in 0..space_per_digit-1 {
 						output.push_str(" ");
@@ -267,7 +321,7 @@ impl Board {
 		let mut reset: bool = true;
 
 		//Show board during calculation. (SUPER SLOWDOWN)
-		//self.show();
+		self.show();
 
 		while reset {
 			self.solved = true;
@@ -305,18 +359,27 @@ fn pause() {
 
 //Main code containing backtracking logic.
 fn main() {
-	let mut final_avg: f64 = 0.0;
+	if let Err(e) = enable_virtual_terminal_processing() {
+        writeln!(io::stderr(), "Error enabling virtual terminal processing: {}", e).unwrap();
+    }
 
-	let mut init = vec![
-		vec![0, 4, 5, 8, 7, 0, 9, 0, 0],
-		vec![0, 0, 0, 9, 0, 0, 0, 0, 0],
-		vec![2, 0, 8, 0, 6, 0, 0, 0, 4],
-		vec![0, 1, 0, 2, 0, 0, 4, 0, 0],
-		vec![9, 3, 0, 5, 4, 7, 2, 0, 0],
-		vec![0, 0, 4, 6, 9, 0, 7, 0, 3],
-		vec![0, 6, 0, 4, 8, 0, 0, 3, 1],
-		vec![3, 8, 0, 7, 0, 2, 6, 0, 9],
-		vec![0, 0, 0, 0, 0, 6, 0, 2, 7]];
+	let init = vec![
+		vec![13,0,0,0,0,10,0,0,6,0,0,0,0,11,0,0],
+		vec![14,3,0,0,0,12,0,9,10,0,0,0,16,0,0,0],
+		vec![0,9,0,0,0,0,1,0,0,0,15,13,8,0,0,12],
+		vec![0,0,0,15,16,0,14,8,4,0,0,0,10,3,2,0],
+		vec![0,0,13,8,15,0,3,0,1,2,6,0,0,16,0,0],
+		vec![0,0,0,0,5,1,6,0,7,0,3,4,0,12,0,0],
+		vec![6,0,0,11,0,2,0,0,0,13,0,15,0,0,0,0],
+		vec![3,0,12,0,0,0,13,0,0,0,5,11,1,0,6,15],
+		vec![0,1,0,13,6,3,0,0,0,0,0,0,2,0,16,0],
+		vec![10,0,0,0,0,0,9,0,8,0,4,16,3,13,0,0],
+		vec![0,11,2,0,7,8,0,16,0,10,13,0,0,0,15,4],
+		vec![12,0,0,14,11,15,0,13,0,0,2,7,5,0,0,0],
+		vec![7,8,0,0,9,0,0,2,0,11,0,10,12,0,0,0],
+		vec![9,0,3,0,0,13,0,0,15,0,0,14,0,0,0,0],
+		vec![0,10,0,1,0,11,0,3,0,0,0,0,0,8,7,0],
+		vec![0,0,15,12,10,0,5,0,2,7,0,0,0,0,9,16]];
 
 	let mut b = Board::new(init.len()); //The main board
 	let mut b_stack: Vec<Board> = vec![]; //The stack of boards
@@ -324,305 +387,73 @@ fn main() {
 	b.init(&init); //Initialize cells and area coordinates
 	b.process_of_elimination(); //Possibilities initialization
 	b_stack.push(b.clone()); //Push first unsolved board to stack.
+	b_stack.push(b.clone());
 
-	let mut reset: bool; //Whether or not to reset if the board isn't solved yet.
+	let mut reset: bool = true; //Whether or not to reset if the board isn't solved yet.
 
-	b_stack.clear();
-	
-	let mut start;
+	//Main back-tracking loop
+	while reset == true && b.solved == false {
+		reset = false;
 
-	let mut duration;
+		//Update temporary board
+		b = b_stack.last_mut().unwrap().clone();
 
-	let mut input_line = String::new();
-	io::stdin()
-		.read_line(&mut input_line)
-		.expect("Failed to read line");
-	let num_of_loop: i32 = input_line.trim().parse().expect("Input not an integer");
+		//Iterate through cells
+		'outer: for i in 0..b.bsize {
+			for j in 0..b.bsize {
 
-	for l in 0..num_of_loop {
+				//Ensure cell is a 0
+				if b.cell[i][j].digit == 0 {
 
-		b_stack.clear();
-		println!("{}/{}", (l+1), num_of_loop);
+					//Ensure cell has possibilities
+					if b.cell[i][j].p.len() > 0 {
 
-		start = Instant::now();
-
-		/* Example 9x9 and 16x16 boards to solve.
-			//Easy difficulty
-			let init = vec![
-				vec![0,4,5,8,7,0,9,0,0],
-				vec![0,0,0,9,0,0,0,0,0],
-				vec![2,0,8,0,6,0,0,0,4],
-				vec![0,1,0,2,0,0,4,0,0],
-				vec![9,3,0,5,4,7,2,0,0],
-				vec![0,0,4,6,9,0,7,0,3],
-				vec![0,6,0,4,8,0,0,3,1],
-				vec![3,8,0,7,0,2,6,0,9],
-				vec![0,0,0,0,0,6,0,2,7]];
-
-			//Master difficulty
-			let init = vec![
-				vec![0,0,0,0,0,0,0,0,0],
-				vec![0,0,4,1,6,2,9,0,0],
-				vec![2,0,0,0,3,0,0,7,0],
-				vec![0,9,0,0,0,0,0,6,3],
-				vec![0,0,0,0,0,0,0,0,0],
-				vec![0,6,0,0,1,3,0,0,7],
-				vec![9,0,6,0,0,5,0,0,0],
-				vec![8,5,0,7,0,6,4,0,0],
-				vec![0,7,0,0,0,0,0,2,0]];
-
-			//Extreme difficulty
-			let init = vec![
-				vec![0,0,7,6,0,5,9,4,0],
-				vec![0,0,0,0,0,0,0,0,6],
-				vec![8,0,0,1,0,0,0,0,0],
-				vec![0,0,0,0,0,0,2,0,0],
-				vec![0,7,0,0,9,0,0,0,0],
-				vec![0,0,9,0,0,4,5,3,0],
-				vec![0,1,0,5,0,0,3,6,0],
-				vec![0,0,0,0,0,6,0,0,7],
-				vec![0,0,3,0,0,0,0,0,2]];
-			
-			//Beyond-hell difficulty
-			let init = vec![
-				vec![9,0,0,0,0,0,0,0,0],
-				vec![0,0,0,0,1,0,0,6,0],
-				vec![0,0,7,3,0,0,8,0,9],
-				vec![0,1,0,4,2,0,0,0,0],
-				vec![0,0,0,0,0,0,0,5,0],
-				vec![6,5,3,0,0,0,0,0,0],
-				vec![8,0,0,0,6,0,0,0,0],
-				vec![0,0,0,0,0,9,0,4,0],
-				vec![0,2,9,0,0,7,1,0,0]];
-
-			//Rated 11.9 difficulty
-			let init = vec![
-				vec![1,2,0,3,0,0,0,0,0],
-				vec![4,0,0,0,0,0,3,0,0],
-				vec![0,0,3,0,5,0,0,0,0],
-				vec![0,0,4,2,0,0,5,0,0],
-				vec![0,0,0,0,8,0,0,0,9],
-				vec![0,6,0,0,0,5,0,7,0],
-				vec![0,0,1,5,0,0,2,0,0],
-				vec![0,0,0,0,9,0,0,6,0],
-				vec![0,0,0,0,0,7,0,0,8]];
-			
-			//Easy 16x16
-			let init = vec![
-				vec![0,4,0,16,2,0,10,14,0,6,0,0,5,15,3,8],
-				vec![2,0,0,8,11,5,6,4,9,15,13,14,7,0,12,0],
-				vec![0,7,0,12,3,0,1,16,10,4,0,0,0,0,0,0],
-				vec![10,11,5,0,8,0,13,15,0,0,0,2,0,1,0,9],
-				vec![14,16,0,10,0,0,9,1,0,12,2,0,8,13,0,0],
-				vec![0,0,6,0,5,2,7,8,0,0,0,0,16,0,0,0],
-				vec![0,13,8,4,15,14,0,0,0,0,3,0,9,0,0,1],
-				vec![0,0,2,15,16,3,11,0,0,0,10,0,0,0,6,12],
-				vec![4,6,3,0,0,0,0,0,7,5,11,0,13,0,0,10],
-				vec![7,5,0,0,0,6,0,0,0,1,0,0,15,0,16,0],
-				vec![12,1,0,11,0,13,0,7,2,14,15,10,0,3,0,4],
-				vec![0,8,15,14,0,10,0,11,4,0,0,0,12,15,0,2],
-				vec![8,0,11,13,0,0,4,2,0,10,5,1,3,0,9,0],
-				vec![6,2,0,7,0,16,3,5,0,0,0,0,0,12,0,0],
-				vec![3,0,12,0,13,1,14,0,0,0,0,6,0,0,0,0],
-				vec![16,10,9,1,12,11,0,6,13,0,7,0,2,14,0,0]];
-
-			//Extreme difficulty 16x16
-			let init = vec![
-				vec![13,0,0,0,0,10,0,0,6,0,0,0,0,11,0,0],
-				vec![14,3,0,0,0,12,0,9,10,0,0,0,16,0,0,0],
-				vec![0,9,0,0,0,0,1,0,0,0,15,13,8,0,0,12],
-				vec![0,0,0,15,16,0,14,8,4,0,0,0,10,3,2,0],
-				vec![0,0,13,8,15,0,3,0,1,2,6,0,0,16,0,0],
-				vec![0,0,0,0,5,1,6,0,7,0,3,4,0,12,0,0],
-				vec![6,0,0,11,0,2,0,0,0,13,0,15,0,0,0,0],
-				vec![3,0,12,0,0,0,13,0,0,0,5,11,1,0,6,15],
-				vec![0,1,0,13,6,3,0,0,0,0,0,0,2,0,16,0],
-				vec![10,0,0,0,0,0,9,0,8,0,4,16,3,13,0,0],
-				vec![0,11,2,0,7,8,0,16,0,10,13,0,0,0,15,4],
-				vec![12,0,0,14,11,15,0,13,0,0,2,7,5,0,0,0],
-				vec![7,8,0,0,9,0,0,2,0,11,0,10,12,0,0,0],
-				vec![9,0,3,0,0,13,0,0,15,0,0,14,0,0,0,0],
-				vec![0,10,0,1,0,11,0,3,0,0,0,0,0,8,7,0],
-				vec![0,0,15,12,10,0,5,0,2,7,0,0,0,0,9,16]];
-
-			//Hard 25x25
-			let init = vec![
-				vec![0,25,0,0,0,0,0,0,1,0,0,6,11,0,0,0,0,0,23,14,0,0,7,0,5],
-				vec![0,22,19,23,12,16,17,20,21,0,0,10,0,1,0,0,8,0,0,0,9,13,24,11,0],
-				vec![7,15,0,0,0,0,2,0,0,6,21,0,12,0,20,0,0,0,24,16,0,0,0,0,0],
-				vec![6,0,10,9,5,0,0,15,4,0,22,0,0,0,8,0,11,0,0,0,2,0,16,0,0],
-				vec![0,20,17,0,21,0,10,0,14,0,24,0,5,0,19,0,13,0,0,25,1,0,0,6,0],
-				vec![1,0,21,0,0,0,0,0,7,23,0,20,0,8,0,0,17,0,6,0,0,5,9,0,13],
-				vec![0,0,7,0,0,0,0,16,13,2,0,14,17,4,5,23,0,0,0,24,0,0,0,0,19],
-				vec![0,5,0,15,17,0,0,25,0,12,0,0,16,0,21,0,18,4,11,8,0,0,0,7,0],
-				vec![0,0,20,0,16,8,0,0,24,0,0,0,0,0,2,12,0,5,0,0,0,1,14,10,11],
-				vec![24,0,0,6,4,18,20,0,0,5,0,0,7,0,3,0,14,16,0,0,0,0,17,23,0],
-				vec![17,0,0,0,0,19,8,1,0,0,9,0,10,21,0,5,24,22,13,0,0,16,6,0,4],
-				vec![0,0,9,12,0,15,0,11,0,0,0,13,18,25,22,0,0,10,0,21,0,0,0,8,0],
-				vec![0,10,1,0,0,0,0,0,0,0,5,4,0,17,6,0,0,0,0,0,0,0,3,9,0],
-				vec![0,4,0,0,0,3,0,14,0,0,23,8,2,20,0,0,0,12,0,6,0,25,5,0,0],
-				vec![11,0,5,8,0,0,23,7,18,21,0,3,1,0,12,0,0,14,15,9,0,0,0,0,2],
-				vec![0,12,14,0,0,0,0,5,6,0,15,0,19,0,0,17,0,0,22,11,24,20,0,0,21],
-				vec![18,2,4,5,0,0,0,13,0,8,14,0,0,0,0,0,9,0,0,19,3,0,10,0,0],
-				vec![0,19,0,0,0,4,14,24,25,0,20,0,3,0,0,10,0,23,0,0,6,7,0,16,0],
-				vec![23,0,0,0,0,21,0,0,0,22,17,5,9,2,0,1,4,18,0,0,0,0,18,0,0],
-				vec![25,0,13,17,0,0,16,0,20,0,0,24,0,22,0,2,21,0,0,0,0,0,23,0,14],
-				vec![0,13,0,0,22,24,0,0,11,0,4,0,21,0,14,0,23,0,9,0,7,0,8,17,0],
-				vec![0,0,25,0,24,0,0,0,16,0,6,0,0,0,11,0,5,21,0,0,20,14,15,0,12],
-				vec![0,0,0,0,0,23,4,0,0,0,2,0,22,0,25,14,0,0,10,0,0,0,0,18,16],
-				vec![0,17,15,10,18,0,0,0,5,0,0,12,0,7,0,0,19,24,3,1,13,6,11,2,0],
-				vec![5,0,23,0,0,10,12,0,0,0,0,0,24,19,0,0,1,0,0,0,0,0,0,21,0]];
-
-			//Easy 25x25
-			let init = vec![
-				vec![18,0,8,0,10,15,9,0,0,12,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0],
-				vec![0,25,23,6,5,3,0,0,20,0,0,0,15,0,0,21,0,0,0,0,17,0,0,16,0],
-				vec![0,0,0,0,0,8,0,0,6,11,5,19,4,0,0,0,1,3,0,0,0,20,21,18,0],
-				vec![0,9,0,15,0,13,16,0,0,0,0,21,0,6,22,0,2,0,0,0,24,0,19,0,0],
-				vec![13,0,0,0,1,17,18,4,5,0,2,11,0,24,10,0,0,0,7,6,22,0,0,23,0],
-				vec![0,0,0,24,0,0,0,16,0,0,17,0,0,0,8,1,7,0,21,0,6,0,13,4,5],
-				vec![11,5,0,0,0,0,0,23,13,0,0,0,0,0,9,0,8,19,10,0,0,0,0,22,15],
-				vec![0,7,25,3,21,0,8,11,0,5,0,0,23,0,0,0,14,0,0,18,10,0,9,19,16],
-				vec![6,0,0,0,4,14,21,0,22,0,7,25,0,0,0,0,0,2,0,17,0,23,0,0,24],
-				vec![20,0,0,10,15,0,0,0,0,19,0,24,0,3,11,13,25,0,0,4,1,0,14,21,0],
-				vec![4,0,15,19,0,7,0,0,25,22,0,0,0,0,0,0,0,0,17,0,12,24,20,0,0],
-				vec![1,20,12,0,22,0,24,0,14,0,0,0,0,17,0,0,0,0,0,2,21,0,0,5,7],
-				vec![25,0,0,0,7,0,1,0,11,21,0,9,0,0,0,0,0,0,5,0,23,3,2,0,0],
-				vec![23,0,0,17,11,0,3,19,0,0,8,0,0,0,20,0,0,0,0,0,0,0,0,0,9],
-				vec![0,0,16,0,2,23,0,0,0,0,14,0,13,0,0,11,22,20,15,0,0,8,0,10,1],
-				vec![10,0,0,8,0,0,4,13,0,0,21,7,0,14,15,0,11,0,1,0,0,0,0,9,0],
-				vec![0,6,24,20,0,16,0,10,0,25,22,0,0,0,0,0,15,0,23,7,0,0,0,0,0],
-				vec![0,2,0,12,0,0,0,5,0,0,0,0,0,0,17,0,13,9,0,0,19,0,0,25,0],
-				vec![15,19,17,21,0,0,12,0,9,0,0,1,25,13,4,0,0,24,0,0,16,6,0,11,22],
-				vec![0,11,0,23,25,2,0,6,0,1,20,5,0,0,19,18,16,0,3,0,7,12,0,13,0],
-				vec![0,0,22,0,20,9,0,18,17,23,0,0,0,0,7,0,0,0,0,0,0,0,6,3,0],
-				vec![0,0,0,18,0,0,22,0,0,0,0,0,0,11,5,0,0,6,0,1,15,13,25,14,20],
-				vec![24,0,14,5,0,0,0,1,16,0,0,15,0,0,0,0,0,0,13,0,9,19,0,7,11],
-				vec![12,0,3,0,0,4,5,14,7,0,0,0,0,0,2,25,17,0,0,0,0,0,0,0,0],
-				vec![0,0,0,0,6,0,10,0,0,0,0,12,0,0,3,16,0,0,0,21,0,22,0,0,4]];
-
-			//Medium 25x25
-			let init = vec![
-				vec![23,2,0,0,0,5,14,0,0,11,0,18,0,20,13,0,0,0,0,0,0,24,19,4,0],
-				vec![17,18,0,25,0,0,21,0,0,24,0,0,0,0,0,0,12,0,4,14,20,9,8,0,0],
-				vec![7,0,0,4,0,0,18,0,1,23,0,0,19,0,0,0,9,2,0,5,0,0,0,0,0],
-				vec![0,14,22,0,0,0,0,0,0,0,0,0,0,0,3,24,0,15,0,8,0,0,0,0,0],
-				vec![24,0,8,6,0,4,20,25,3,0,16,12,15,9,0,1,10,0,0,0,0,0,0,0,0],
-				vec![0,0,0,0,22,25,8,2,24,0,21,0,9,6,0,0,0,0,0,10,23,0,0,20,0],
-				vec![0,24,13,1,0,0,17,0,14,0,3,0,20,0,0,0,7,0,23,0,10,0,16,0,0],
-				vec![0,19,0,20,4,22,0,0,0,0,11,0,0,0,0,0,0,12,13,9,7,6,15,0,0],
-				vec![9,0,0,0,0,13,16,0,0,12,23,0,0,0,10,11,0,0,0,1,0,18,4,21,3],
-				vec![6,0,0,0,3,20,0,0,15,0,14,0,5,0,17,16,0,8,19,25,0,0,0,9,0],
-				vec![0,0,19,0,0,21,0,0,17,20,0,0,0,23,0,0,0,1,0,4,0,10,0,2,15],
-				vec![0,0,0,0,0,0,0,0,0,2,5,0,14,15,0,0,18,0,17,0,8,21,0,3,0],
-				vec![0,0,0,12,7,0,15,8,0,9,0,1,24,0,0,6,0,22,0,0,0,20,0,0,0],
-				vec![1,0,20,10,0,0,0,0,0,6,0,7,12,0,0,0,14,0,3,0,0,0,0,0,0],
-				vec![4,0,0,0,14,0,0,11,18,0,0,0,0,0,0,0,0,16,0,0,19,7,25,1,0],
-				vec![0,0,11,15,18,16,0,0,0,0,2,0,0,0,20,23,0,7,12,0,0,25,13,0,22],
-				vec![0,8,16,0,0,0,0,0,5,22,0,0,3,13,0,0,0,0,10,0,0,17,0,18,0],
-				vec![0,0,10,0,0,12,13,0,0,1,24,0,0,22,0,25,0,9,0,21,0,0,0,19,0],
-				vec![3,0,0,0,12,0,0,23,0,0,6,19,10,0,15,2,5,13,0,0,0,0,0,0,8],
-				vec![20,0,23,21,0,0,0,0,6,3,4,8,1,0,5,17,0,0,16,0,0,15,0,10,12],
-				vec![0,17,21,0,0,0,0,0,0,0,12,0,0,1,11,0,16,0,0,0,4,0,7,8,0],
-				vec![10,5,0,0,6,7,2,4,22,0,15,0,0,0,19,0,0,0,0,0,12,0,21,0,1],
-				vec![16,0,0,18,0,0,3,0,11,14,0,25,23,0,24,4,17,0,20,0,9,2,10,6,0],
-				vec![14,22,0,0,0,23,25,0,21,0,7,3,8,5,0,0,0,0,9,0,17,13,0,0,0],
-				vec![12,0,0,7,1,8,0,0,16,0,0,17,0,14,2,5,0,0,0,0,24,0,0,25,0]];
-		*/
-
-		//The sudoku board to solve.
-		init = vec![
-				vec![1,2,0,3,0,0,0,0,0],
-				vec![4,0,0,0,0,0,3,0,0],
-				vec![0,0,3,0,5,0,0,0,0],
-				vec![0,0,4,2,0,0,5,0,0],
-				vec![0,0,0,0,8,0,0,0,9],
-				vec![0,6,0,0,0,5,0,7,0],
-				vec![0,0,1,5,0,0,2,0,0],
-				vec![0,0,0,0,9,0,0,6,0],
-				vec![0,0,0,0,0,7,0,0,8]];
-
-		b = Board::new(init.len()); //The main board
-		b_stack = vec![]; //The stack of boards
-
-		b.init(&init); //Initialize cells and area coordinates
-		b.update_all_p();
-		b.process_of_elimination(); //Possibilities initialization
-		
-		//b.show();
-		
-		b_stack.push(b.clone()); //Push first unsolved board to stack.
-
-		reset = true; //Whether or not to reset if the board isn't solved yet.
-
-		//Main back-tracking loop
-		while reset == true && b.solved == false {
-			reset = false;
-
-			//Update temporary board
-			b = b_stack.last_mut().unwrap().clone();
-
-			//Iterate through cells
-			'outer: for i in 0..b.bsize {
-				for j in 0..b.bsize {
-
-					//Ensure cell is a 0
-					if b.cell[i][j].digit == 0 {
-
-						//Ensure cell has possibilities
-						if b.cell[i][j].p.len() > 0 {
-
-							//Set cell to first possibility and update the last-modified cell data.
-							b.cell[i][j].digit = b.cell[i][j].p[0];
-							b.last_modified = [i, j, b.cell[i][j].p[0] as usize];
-							b.update_p([i, j]);
-							//Update all possibilities and check for lone-possibilities in rows/cols/houses.
-							b.process_of_elimination();
-							
-							//Push board to stack
-							b_stack.push(b.clone());
-							b = b_stack.last_mut().unwrap().clone();
-
-						//No possibilities mean the current board state is impossible to solve.
-						} else {
-
-							//Only encountered if the board is unsolvable, which means it was entered incorrectly.
-							//if b_stack.len() == 1 {
-							//	panic!("ERROR - Sudoku board not entered correctly.");
-							//}
-
-							//Pop top of stack.
-							b_stack.pop();
-
-							//Revert the last-modified cell to a 0 and update its p_limit list.
-							b_stack.last_mut().unwrap().cell[b.last_modified[0]][b.last_modified[1]].p_limit.push(b.last_modified[2] as u16);
-							b_stack.last_mut().unwrap().cell[b.last_modified[0]][b.last_modified[1]].digit = 0;
-							
-							b_stack.last_mut().unwrap().update_all_p();
-							//b_stack.last_mut().unwrap().update_p([b.last_modified[0], b.last_modified[1]]);
-							
-							//Update all possibilities and check for lone-possibilities in rows/cols/houses.
-							b_stack.last_mut().unwrap().process_of_elimination();
-							
-							reset = true;
-							break 'outer;
+						//Set cell to first possibility and update the last-modified cell data.
+						b.cell[i][j].digit = b.cell[i][j].p[0];
+						if b.cell[i][j].p.len() == 1 {
+							b.cell[i][j].known = true;
 						}
+						b.last_modified = [i, j, b.cell[i][j].p[0] as usize];
+						b.update_p([i, j]);
+
+						//Update all possibilities and check for lone-possibilities in rows/cols/houses.
+						b.process_of_elimination();
+						
+						//Push board to stack
+						b_stack.push(b.clone());
+						b = b_stack.last_mut().unwrap().clone();
+
+					//No possibilities mean the current board state is impossible to solve.
+					} else {
+
+						//Only encountered if the board is unsolvable, which means it was entered incorrectly.
+						if b_stack.len() == 1 {
+							panic!("ERROR - Sudoku board not entered correctly.");
+						}
+
+						//Pop top of stack.
+						b_stack.pop();
+
+						//Revert the last-modified cell to a 0 and update its p_limit list.
+						b_stack.last_mut().unwrap().cell[b.last_modified[0]][b.last_modified[1]].p_limit.push(b.last_modified[2] as u16);
+						b_stack.last_mut().unwrap().cell[b.last_modified[0]][b.last_modified[1]].digit = 0;
+						
+						b_stack.last_mut().unwrap().update_all_p();
+						
+						//Update all possibilities and check for lone-possibilities in rows/cols/houses.
+						b_stack.last_mut().unwrap().process_of_elimination();
+						
+						reset = true;
+						break 'outer;
 					}
 				}
 			}
 		}
-		
-		duration = start.elapsed();
-
-		final_avg += duration.as_secs_f64() * 1000.0;
 	}
+	
 	//Show the solved board
 	b_stack.last_mut().unwrap().show();
-	//b.show();
-	final_avg = final_avg/(num_of_loop as f64);
-	println!("{}", final_avg);
+
 	pause();
-
-
 
 }
