@@ -90,7 +90,7 @@ impl Board {
 		}
 	}
 
-	//Initialize values of board from given input
+	//Initialize values of board from given input, where init is the sudoku board.
 	fn init(&mut self, init: &Vec<Vec<u16>>) {
 
 		let mut hx: usize;
@@ -138,7 +138,6 @@ impl Board {
 						}
 					}
 				}
-
 
 				//Initialize AOE coordinates
 				for k in (self.hsize-(j%self.hsize)+j)..self.bsize {
@@ -256,9 +255,7 @@ impl Board {
 
 	//Updates the possibilities of all cells, restricted by p_limit.
 	fn update_p(&mut self, c: [usize; 2]) {
-		let mut row: Vec<u16>; //Current cell's row
-		let mut col: Vec<u16>; //Current cell's col
-		let mut house: Vec<u16>; //Current cell's house
+		let mut aoe: Vec<u16>; //Current cell's house
 		let mut p_len: u16;
 		
 		for each in &self.cell[c[0]][c[1]].aoe.clone() {
@@ -268,12 +265,10 @@ impl Board {
 				self.cell[each[0]][each[1]].p.clear();
 
 				//Assign all possibilities, restricted by limit and p_limit.
-				row = self.coords_to_digits(&self.cell[each[0]][each[1]].row, false);
-				col = self.coords_to_digits(&self.cell[each[0]][each[1]].col, false);
-				house = self.coords_to_digits(&self.cell[each[0]][each[1]].house, false);
+				aoe = self.coords_to_digits(&self.cell[each[0]][each[1]].aoe, false);
 
 				for k in 1..(self.bsize+1) {
-					if !row.contains(&(k as u16)) && !col.contains(&(k as u16)) && !house.contains(&(k as u16)) && !self.cell[each[0]][each[1]].p_limit.contains(&(k as u16)) {
+					if !aoe.contains(&(k as u16)) && !self.cell[each[0]][each[1]].p_limit.contains(&(k as u16)) {
 						self.cell[each[0]][each[1]].p.push(k as u16);
 						p_len += 1;
 					}
@@ -290,9 +285,7 @@ impl Board {
 
 	//Updates the possibilities of all cells, restricted by p_limit.
 	fn update_all_p(&mut self) {
-		let mut row: Vec<u16>; //Current cell's row
-		let mut col: Vec<u16>; //Current cell's col
-		let mut house: Vec<u16>; //Current cell's house
+		let mut aoe: Vec<u16>; //Current cell's house
 		
 		//Iterate through cells
 		for i in 0..self.bsize {
@@ -302,13 +295,11 @@ impl Board {
 
 					self.cell[i][j].p.clear();
 
-					row = self.coords_to_digits(&self.cell[i][j].row, false);
-					col = self.coords_to_digits(&self.cell[i][j].col, false);
-					house = self.coords_to_digits(&self.cell[i][j].house, false);
+					aoe = self.coords_to_digits(&self.cell[i][j].aoe, false);
 
 					//Assign all possibilities, restricted by limit and p_limit.
 					for k in 1..(self.bsize+1) {
-						if !row.contains(&(k as u16)) && !col.contains(&(k as u16)) && !house.contains(&(k as u16)) && !self.cell[i][j].p_limit.contains(&(k as u16)) {
+						if !aoe.contains(&(k as u16)) && !self.cell[i][j].p_limit.contains(&(k as u16)) {
 							self.cell[i][j].p.push(k as u16);
 						}
 					}
@@ -371,9 +362,9 @@ fn main() {
     }
 
 	let init = vec![
-				vec![0,0,0,0,0,0,0,0,0],
+				vec![1,2,0,3,0,0,0,0,0],
 				vec![4,0,0,0,0,0,3,0,0],
-				vec![0,0,0,0,5,0,0,0,0],
+				vec![0,0,3,0,5,0,0,0,0],
 				vec![0,0,4,2,0,0,5,0,0],
 				vec![0,0,0,0,8,0,0,0,9],
 				vec![0,6,0,0,0,5,0,7,0],
@@ -388,12 +379,8 @@ fn main() {
 	b.process_of_elimination(); //Possibilities initialization
 	b_stack.push(b.clone()); //Push first unsolved board to stack.
 	b_stack.push(b.clone());
-
-	let mut reset: bool = true; //Whether or not to reset if the board isn't solved yet.
-
 	//Main back-tracking loop
-	while reset == true && b.solved == false {
-		reset = false;
+	while b.solved == false {
 
 		//Update temporary board
 		b = b_stack.last_mut().unwrap().clone();
@@ -442,8 +429,7 @@ fn main() {
 						
 						//Update all possibilities and check for lone-possibilities in rows/cols/houses.
 						b_stack.last_mut().unwrap().process_of_elimination();
-						
-						reset = true;
+
 						break 'outer;
 					}
 				}

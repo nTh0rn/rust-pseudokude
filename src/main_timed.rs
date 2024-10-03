@@ -207,9 +207,7 @@ impl Board {
 
 	//Updates the possibilities of all cells, restricted by p_limit.
 	fn update_p(&mut self, c: [usize; 2]) {
-		let mut row: Vec<u16>; //Current cell's row
-		let mut col: Vec<u16>; //Current cell's col
-		let mut house: Vec<u16>; //Current cell's house
+		let mut aoe: Vec<u16>; //Current cell's house
 		let mut p_len: u16;
 		
 		for each in &self.cell[c[0]][c[1]].aoe.clone() {
@@ -219,12 +217,10 @@ impl Board {
 				self.cell[each[0]][each[1]].p.clear();
 
 				//Assign all possibilities, restricted by limit and p_limit.
-				row = self.coords_to_digits(&self.cell[each[0]][each[1]].row, false);
-				col = self.coords_to_digits(&self.cell[each[0]][each[1]].col, false);
-				house = self.coords_to_digits(&self.cell[each[0]][each[1]].house, false);
+				aoe = self.coords_to_digits(&self.cell[each[0]][each[1]].aoe, false);
 
 				for k in 1..(self.bsize+1) {
-					if !row.contains(&(k as u16)) && !col.contains(&(k as u16)) && !house.contains(&(k as u16)) && !self.cell[each[0]][each[1]].p_limit.contains(&(k as u16)) {
+					if !aoe.contains(&(k as u16))&& !self.cell[each[0]][each[1]].p_limit.contains(&(k as u16)) {
 						self.cell[each[0]][each[1]].p.push(k as u16);
 						p_len += 1;
 					}
@@ -241,9 +237,7 @@ impl Board {
 
 	//Updates the possibilities of all cells, restricted by p_limit.
 	fn update_all_p(&mut self) {
-		let mut row: Vec<u16>; //Current cell's row
-		let mut col: Vec<u16>; //Current cell's col
-		let mut house: Vec<u16>; //Current cell's house
+		let mut aoe: Vec<u16>; //Current cell's house
 		
 		//Iterate through cells
 		for i in 0..self.bsize {
@@ -252,14 +246,11 @@ impl Board {
 				if self.cell[i][j].digit == 0 {
 
 					self.cell[i][j].p.clear();
-
-					row = self.coords_to_digits(&self.cell[i][j].row, false);
-					col = self.coords_to_digits(&self.cell[i][j].col, false);
-					house = self.coords_to_digits(&self.cell[i][j].house, false);
+					aoe = self.coords_to_digits(&self.cell[i][j].aoe, false);
 
 					//Assign all possibilities, restricted by limit and p_limit.
 					for k in 1..(self.bsize+1) {
-						if !row.contains(&(k as u16)) && !col.contains(&(k as u16)) && !house.contains(&(k as u16)) && !self.cell[i][j].p_limit.contains(&(k as u16)) {
+						if !aoe.contains(&(k as u16)) && !self.cell[i][j].p_limit.contains(&(k as u16)) {
 							self.cell[i][j].p.push(k as u16);
 						}
 					}
