@@ -47,8 +47,8 @@ Psuedokude is a dynamic sudoku solver that can solve boards of any size up to a 
 ### Prerequisites
 
 1. Download Rust\
-1.1 Windows: Download the installer [here](https://rustup.rs/)\
-1.2 Linux/macOS: Execute `curl https://sh.rustup.rs -sSf | sh`
+1.1 Windows: download the installer [here](https://rustup.rs/)\
+1.2 Linux/macOS: execute `curl https://sh.rustup.rs -sSf | sh`
 3. Add the `colored` crate
    ```sh
    cargo add colored
