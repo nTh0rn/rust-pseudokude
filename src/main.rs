@@ -231,14 +231,14 @@ impl Board {
 	}
 
 	//Returns a vector of digits OR candidates from a vector of coordinates
-	fn coords_to_digits(&self, area: &Vec<[usize; 2]>, return_c: bool) -> Vec<u16> {
+	fn coords_to_digits(&self, area: &Vec<[usize; 2]>, return_cand: bool) -> Vec<u16> {
 		let mut output: Vec<u16> = vec![];
 
 		//Iterate through area
 		for each in area {
 
 			//Whether to return area's digits or all of area's candidates
-			if return_c {
+			if return_cand {
 				if self.cell[each[0]][each[1]].digit == 0 {
 					for each in &self.cell[each[0]][each[1]].cand {
 						output.push(*each);
@@ -254,11 +254,11 @@ impl Board {
 	}
 
 	//Updates the candidates of all cells, restricted by cand_limit.
-	fn update_p(&mut self, cand: [usize; 2]) {
+	fn update_cand(&mut self, coord: [usize; 2]) {
 		let mut aoe: Vec<u16>; //Current cell's house
 		let mut cand_len: u16;
 		
-		for each in &self.cell[cand[0]][cand[1]].aoe.clone() {
+		for each in &self.cell[coord[0]][coord[1]].aoe.clone() {
 			if self.cell[each[0]][each[1]].digit == 0 {
 
 				cand_len = 0;
@@ -277,14 +277,14 @@ impl Board {
 				//If there is only 1 candidate, set it as the digit and restart.
 				if cand_len == 1 {
 					self.cell[each[0]][each[1]].digit = self.cell[each[0]][each[1]].cand[0];
-					self.update_p([each[0], each[1]]);
+					self.update_cand([each[0], each[1]]);
 				}
 			}
 		}
 	}
 
 	//Updates the candidates of all cells, restricted by cand_limit.
-	fn update_all_p(&mut self) {
+	fn update_all_cand(&mut self) {
 		let mut aoe: Vec<u16>; //Current cell's house
 		
 		//Iterate through cells
@@ -310,35 +310,41 @@ impl Board {
 	}
 
 	
-	//Checks for lone-candidate's and updates all candidates.
+	//Checks for cells that have candidates that are unique to one of its areas
 	fn process_of_elimination(&mut self) {
 		let mut c: u16; //Current cell's candidate
 		let mut row: Vec<u16>; //Current cell's row
 		let mut col: Vec<u16>; //Current cell's col
 		let mut house: Vec<u16>; //Current cell's house
-		let mut reset: bool = true;
+		let mut reset: bool = true; //Whether or not to keep searching
 
 		//Show board during calculation. (SUPER SLOWDOWN)
 		self.show();
 
+		//Start search
 		while reset {
 			self.solved = true;
 			reset = false;
+
+			//Iterate through all cells
 			for i in 0..self.bsize {
 				for j in 0..self.bsize {
+
 					//Ensure cell is a 0
 					if self.cell[i][j].digit == 0 {
 						self.solved = false;
+
+						//Establish candidates in each area
 						row = self.coords_to_digits(&self.cell[i][j].row, true);
 						col = self.coords_to_digits(&self.cell[i][j].col, true);
 						house = self.coords_to_digits(&self.cell[i][j].house, true);
 
-						//If area's do not contain a candidate, then set digit to candidate.
+						//If areas do not contain candidate, then set cell to candidate.
 						for k in 0..self.cell[i][j].cand.len() {
 							c = self.cell[i][j].cand[k];
 							if !row.contains(&c) || !col.contains(&c) || !house.contains(&c) {
 								self.cell[i][j].digit = c;
-								self.update_p([i, j]);
+								self.update_cand([i, j]);
 								reset = true;
 							}
 						}
@@ -376,9 +382,10 @@ fn main() {
 	let mut b_stack: Vec<Board> = vec![]; //The stack of boards
 
 	b.init(&init); //Initialize cells and area coordinates
+	b.update_all_cand(); //Update the candidates for all cells
 	b.process_of_elimination(); //candidates initialization
 	b_stack.push(b.clone()); //Push first unsolved board to stack.
-	b_stack.push(b.clone());
+
 	//Main back-tracking loop
 	while b.solved == false {
 
@@ -401,14 +408,13 @@ fn main() {
 							b.cell[i][j].known = true;
 						}
 						b.last_modified = [i, j, b.cell[i][j].cand[0] as usize];
-						b.update_p([i, j]);
 
-						//Update all candidates and check for lone-candidates in rows/cols/houses.
+						//Update candidates and check for area candidate eliminations.
+						b.update_cand([i, j]);
 						b.process_of_elimination();
 						
 						//Push board to stack
 						b_stack.push(b.clone());
-						b = b_stack.last_mut().unwrap().clone();
 
 					//No candidates mean the current board state is impossible to solve.
 					} else {
@@ -425,11 +431,11 @@ fn main() {
 						b_stack.last_mut().unwrap().cell[b.last_modified[0]][b.last_modified[1]].cand_limit.push(b.last_modified[2] as u16);
 						b_stack.last_mut().unwrap().cell[b.last_modified[0]][b.last_modified[1]].digit = 0;
 						
-						b_stack.last_mut().unwrap().update_all_p();
-						
-						//Update all candidates and check for lone-candidates in rows/cols/houses.
+						//Update candidates and check for area candidate eliminations.
+						b_stack.last_mut().unwrap().update_all_cand();
 						b_stack.last_mut().unwrap().process_of_elimination();
 
+						//Restart search
 						break 'outer;
 					}
 				}
