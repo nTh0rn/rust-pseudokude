@@ -171,10 +171,10 @@ impl Board {
 		output.push_str("\n");
 
 		output.push_str(&format!("{} - Original puzzle\n", "White\t"));
-		output.push_str(&format!("{} - Solved by candidate-analysis\n", "Red\t".red()));
+		output.push_str(&format!("{} - Solved via candidate analysis\n", "Red\t".red()));
 		output.push_str(&format!("{} - Current backtracking cell\n", "Blue\t".cyan()));
-		output.push_str(&format!("{} - Solved by backtracking, other candidates still exist\n", "Yellow\t".yellow()));
-		output.push_str(&format!("{} - Solved by backtracking, no more candidates exist\n\n", "Green\t".green()));
+		output.push_str(&format!("{} - Solved via backtracking, other candidates still exist\n", "Yellow\t".yellow()));
+		output.push_str(&format!("{} - Solved via backtracking, no more candidates exist\n\n", "Green\t".green()));
 
 		//Main loop
 		for i in 0..self.bsize {
@@ -319,8 +319,7 @@ impl Board {
 		let mut reset: bool = true; //Whether or not to keep searching
 
 		//Show board during calculation. (SUPER SLOWDOWN)
-		self.show();
-
+		//self.show();
 		//Start search
 		while reset {
 			self.solved = true;
@@ -368,9 +367,9 @@ fn main() {
     }
 
 	let init = vec![
-				vec![1,2,0,3,0,0,0,0,0],
+				vec![0,0,0,0,0,0,0,0,0],
 				vec![4,0,0,0,0,0,3,0,0],
-				vec![0,0,3,0,5,0,0,0,0],
+				vec![0,0,0,0,5,0,0,0,0],
 				vec![0,0,4,2,0,0,5,0,0],
 				vec![0,0,0,0,8,0,0,0,9],
 				vec![0,6,0,0,0,5,0,7,0],
@@ -385,7 +384,7 @@ fn main() {
 	b.update_all_cand(); //Update the candidates for all cells
 	b.process_of_elimination(); //candidates initialization
 	b_stack.push(b.clone()); //Push first unsolved board to stack.
-
+	b_stack.push(b.clone());
 	//Main back-tracking loop
 	while b.solved == false {
 
@@ -398,10 +397,10 @@ fn main() {
 
 				//Ensure cell is a 0
 				if b.cell[i][j].digit == 0 {
-
+					
 					//Ensure cell has candidates
 					if b.cell[i][j].cand.len() > 0 {
-
+						
 						//Set cell to first candidate and update the last-modified cell data.
 						b.cell[i][j].digit = b.cell[i][j].cand[0];
 						if b.cell[i][j].cand.len() == 1 {
@@ -416,6 +415,8 @@ fn main() {
 						//Push board to stack
 						b_stack.push(b.clone());
 
+						b.show();
+						
 					//No candidates mean the current board state is impossible to solve.
 					} else {
 
@@ -434,7 +435,6 @@ fn main() {
 						//Update candidates and check for area candidate eliminations.
 						b_stack.last_mut().unwrap().update_all_cand();
 						b_stack.last_mut().unwrap().process_of_elimination();
-
 						//Restart search
 						break 'outer;
 					}
