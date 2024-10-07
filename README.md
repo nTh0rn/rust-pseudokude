@@ -37,7 +37,9 @@
 
 <!-- ABOUT -->
 ## About
-Psuedokude is a dynamic sudoku solver that can solve boards of any size up to a `u16`. Psuedokude solves using stack-based backtracking as well as possibility analysis. An in-depth article discussing all the algorithms involved is coming soon to [my website](https://nthorn.com).
+Psuedokude is a dynamic sudoku solver that can solve boards of any size up to a `u16`. Psuedokude solves using stack-based backtracking as well as candidate analysis.
+
+Read an in-depth analysis of this project [here](https://www.nthorn.com/articles/pseudokude).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
